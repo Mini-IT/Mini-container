@@ -1,4 +1,4 @@
-namespace ArcCore
+namespace MiniContainer
 {
     public interface IContainerUpdateListener
     {

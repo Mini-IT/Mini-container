@@ -2,7 +2,7 @@
 using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
 
-namespace ArcCore
+namespace MiniContainer
 {
     public class DIService : IDIService
     {

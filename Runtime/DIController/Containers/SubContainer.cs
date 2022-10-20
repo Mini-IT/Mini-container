@@ -1,15 +1,15 @@
 using UnityEngine;
 
-namespace ArcCore
+namespace MiniContainer
 {
     [DefaultExecutionOrder(-6000)]
     public class SubContainer : Container
     {
-        protected IBaseDIService DiService;
+        protected IBaseDIService DIService;
 
         public void Init(IBaseDIService diService, IContainer container)
         {
-            DiService = diService;
+            DIService = diService;
             DIContainer = container;
             Register();
             container.ResolveInstanceRegistered(true);

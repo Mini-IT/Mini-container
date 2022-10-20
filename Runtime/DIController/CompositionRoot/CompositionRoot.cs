@@ -2,7 +2,7 @@
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
-namespace ArcCore
+namespace MiniContainer
 {
     [DefaultExecutionOrder(-7000)]
     public class CompositionRoot : MonoBehaviour
@@ -56,9 +56,8 @@ namespace ArcCore
         {
             _diService = new DIService();
             _container = _diService.GenerateContainer();
-            _diService.RegisterInstance<IServiceProvider>(new ServiceProvider(_container));
-            foreach (var subContainer in _rootContainers)
-                subContainer.Init(_diService, _container);
+            foreach (var rootContainer in _rootContainers)
+                rootContainer.Init(_diService, _container);
 
             SceneManager.sceneLoaded += OnSceneLoaded;
             SceneManager.sceneUnloaded += OnSceneUnloaded;

@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 
-namespace ArcCore
+namespace MiniContainer
 {
     public static class ObjectListBuffer<T> where T : UnityEngine.Object
     {

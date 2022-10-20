@@ -1,5 +1,5 @@
 ﻿using System;
-namespace ArcCore
+namespace MiniContainer
 {
     public abstract class AbstractFactoryService<T> : IFactoryService<T>
     {

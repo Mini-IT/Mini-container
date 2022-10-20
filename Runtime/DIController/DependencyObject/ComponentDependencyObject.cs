@@ -1,7 +1,7 @@
 ﻿using System;
 using UnityEngine;
 
-namespace ArcCore
+namespace MiniContainer
 {
     public class ComponentDependencyObject : DependencyObject
     {

@@ -1,4 +1,4 @@
-﻿namespace ArcCore
+﻿namespace MiniContainer
 {
     public class LazyService<T> : ILazyService<T>
     {

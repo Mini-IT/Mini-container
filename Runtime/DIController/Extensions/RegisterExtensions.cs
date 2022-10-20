@@ -2,7 +2,7 @@
 using System.Runtime.CompilerServices;
 using UnityEngine;
 
-namespace ArcCore
+namespace MiniContainer
 {
     public static class RegisterExtensions
     {

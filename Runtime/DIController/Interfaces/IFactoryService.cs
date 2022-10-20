@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace ArcCore
+namespace MiniContainer
 {
     public interface IFactoryService<out T>: IDisposable
     {

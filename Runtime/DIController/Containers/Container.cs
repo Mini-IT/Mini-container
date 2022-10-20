@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace ArcCore
+namespace MiniContainer
 {
     public abstract class Container :  MonoBehaviour
     {

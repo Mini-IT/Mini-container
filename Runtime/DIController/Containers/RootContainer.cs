@@ -1,12 +1,12 @@
-﻿namespace ArcCore
+﻿namespace MiniContainer
 {
     public abstract class RootContainer : Container
     {
-        protected IDIService DiService { get; private set; }
+        protected IDIService DIService { get; private set; }
 
         public void Init(IDIService diService, IContainer container)
         {
-            DiService = diService;
+            DIService = diService;
             DIContainer = container;
             Register();
             container.ResolveInstanceRegistered(false);

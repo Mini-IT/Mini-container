@@ -1,7 +1,7 @@
 ﻿
 using System;
 
-namespace ArcCore
+namespace MiniContainer
 {
     [AttributeUsage(AttributeTargets.Field | AttributeTargets.Method | AttributeTargets.Property)]
     public class ResolveAttribute : Attribute

@@ -1,7 +1,7 @@
 ﻿
 using System;
 
-namespace ArcCore
+namespace MiniContainer
 {
     public interface IServiceProvider: IDisposable
     {

@@ -7,7 +7,7 @@ using System.Runtime.CompilerServices;
 using UnityEngine;
 using Debug = UnityEngine.Debug;
 
-namespace ArcCore
+namespace MiniContainer
 {
     public class DIContainer : IContainer
     {

@@ -1,6 +1,6 @@
 ﻿using System.Runtime.CompilerServices;
 
-namespace ArcCore
+namespace MiniContainer
 {
     public static class ReleaseExtensions
     {
