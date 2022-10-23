@@ -6,9 +6,10 @@ namespace MiniContainer
     public abstract class Container :  MonoBehaviour
     {
         [SerializeField]
-        private List<GameObject> _autoInjectGameObjects;
-        [SerializeField]
         private List<GameObject> _autoRegisterGameObjects;
+
+        [SerializeField]
+        private List<GameObject> _autoInjectGameObjects;
 
         protected IContainer DIContainer { get; set; }
 
