@@ -58,6 +58,17 @@ namespace MiniContainer
             diService.Register(instanceRegistrationDependencyObject);
         }
 
+        /// <summary>
+        /// Store an instance from an implemented class
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void RegisterInstanceAsSelf(this IDIService diService,
+            object implementation)
+        {
+            var instanceRegistrationDependencyObject = new InstanceRegistrationDependencyObject(implementation.GetType(), implementation, false);
+            diService.Register(instanceRegistrationDependencyObject);
+        }
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void Register<TService, TImplementation>(this IDIService diService, 
             ServiceLifeTime serviceLifeTime = ServiceLifeTime.Singleton) 
@@ -116,6 +127,17 @@ namespace MiniContainer
             TService implementation)
         {
             var instanceRegistrationDependencyObject = new InstanceRegistrationDependencyObject(typeof(TService), implementation, true);
+            diService.Register(instanceRegistrationDependencyObject);
+        }
+
+        /// <summary>
+        /// Store an instance from an implemented class
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void RegisterInstanceAsSelf(this IBaseDIService diService,
+            object implementation)
+        {
+            var instanceRegistrationDependencyObject = new InstanceRegistrationDependencyObject(implementation.GetType(), implementation, true);
             diService.Register(instanceRegistrationDependencyObject);
         }
 

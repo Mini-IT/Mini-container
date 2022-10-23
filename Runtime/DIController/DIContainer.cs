@@ -152,6 +152,12 @@ namespace MiniContainer
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public object GetInstance(Type serviceType)
+        {
+            return !_serviceDictionary.TryGetValue(serviceType, out var dependencyObject) ? null : dependencyObject.Implementation;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private DependencyObject ResolveType(Type serviceType)
         {
             if (!_serviceDictionary.TryGetValue(serviceType, out var dependencyObject))
@@ -210,7 +216,6 @@ namespace MiniContainer
             }
             catch (Exception e)
             {
-                Debug.LogException(e);
                 throw new Exception($"{e.Message}");
             }
 

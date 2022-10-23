@@ -5,6 +5,7 @@ namespace MiniContainer
     public interface IContainer
     {
         object Resolve(Type serviceType);
+        object GetInstance(Type serviceType);
         void ResolveObject(object implementation);
         void ResolveInstanceRegistered(bool onSceneDestroyRelease);
         void Release(Type type);

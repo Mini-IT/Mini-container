@@ -1,6 +1,5 @@
 ﻿using MiniContainer;
 using UnityEditor;
-using UnityEngine;
 
 namespace MiniContainer.Editor
 {
