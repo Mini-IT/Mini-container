@@ -1,9 +1,8 @@
 {
-    "name": "MiniIT.MiniContainer",
-    "references": [
-	],
+    "name": "MiniIT.MiniContainer.Editor",
+    "references": ["MiniIT.MiniContainer"],
     "optionalUnityReferences": [],
-    "excludePlatforms": [],
+    "includePlatforms": ["Editor"],
 	"allowUnsafeCode": false,
     "overrideReferences": false,
     "precompiledReferences": [],
