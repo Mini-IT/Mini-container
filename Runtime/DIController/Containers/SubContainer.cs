@@ -20,7 +20,7 @@ namespace MiniContainer
         private void Awake()
         {
             CompositionRoot.Instance.SubContainerInit(this);
-            AutoInjectAll();
+            AutoResolveAll();
         }
 
         protected override void DoRegister(IRegistrable registrable)

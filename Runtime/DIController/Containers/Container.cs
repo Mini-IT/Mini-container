@@ -9,7 +9,7 @@ namespace MiniContainer
         private List<GameObject> _autoRegisterGameObjects;
 
         [SerializeField]
-        private List<GameObject> _autoInjectGameObjects;
+        private List<GameObject> _autoResolveGameObjects;
 
         protected IContainer DIContainer { get; set; }
 
@@ -54,21 +54,21 @@ namespace MiniContainer
 
         protected abstract void DoRegister(IRegistrable registrable);
 
-        protected void AutoInjectAll()
+        protected void AutoResolveAll()
         {
-            if (_autoInjectGameObjects == null)
+            if (_autoResolveGameObjects == null)
                 return;
 
-            foreach (var target in _autoInjectGameObjects)
+            foreach (var target in _autoResolveGameObjects)
             {
                 if (target != null) // Check missing reference
                 {
-                    InjectGameObject(target);
+                    ResolveGameObject(target);
                 }
             }
         }
 
-        private void InjectGameObject(GameObject go)
+        private void ResolveGameObject(GameObject go)
         {
             var buffer = ObjectListBuffer<MonoBehaviour>.Get();
 

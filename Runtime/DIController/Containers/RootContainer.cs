@@ -12,7 +12,7 @@
             Register();
             container.ResolveInstanceRegistered(false);
             Resolve();
-            AutoInjectAll();
+            AutoResolveAll();
         }
 
         protected override void DoRegister(IRegistrable registrable)
