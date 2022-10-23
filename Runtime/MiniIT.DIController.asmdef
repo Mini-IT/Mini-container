@@ -1,7 +1,6 @@
 {
     "name": "MiniIT.MiniContainer",
-    "references": [
-	],
+    "references": [],
     "optionalUnityReferences": [],
     "excludePlatforms": [],
 	"allowUnsafeCode": false,

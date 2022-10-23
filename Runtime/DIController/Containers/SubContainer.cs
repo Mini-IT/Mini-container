@@ -11,6 +11,7 @@ namespace MiniContainer
         {
             DIService = diService;
             DIContainer = container;
+            AutoRegisterAll();
             Register();
             container.ResolveInstanceRegistered(true);
             Resolve();
@@ -20,6 +21,11 @@ namespace MiniContainer
         {
             CompositionRoot.Instance.SubContainerInit(this);
             AutoInjectAll();
+        }
+
+        protected override void DoRegister(IRegistrable registrable)
+        {
+            DIService.RegisterInstanceAsSelf(registrable);
         }
     }
 }

@@ -8,10 +8,16 @@
         {
             DIService = diService;
             DIContainer = container;
+            AutoRegisterAll();
             Register();
             container.ResolveInstanceRegistered(false);
             Resolve();
             AutoInjectAll();
+        }
+
+        protected override void DoRegister(IRegistrable registrable)
+        {
+            DIService.RegisterInstanceAsSelf(registrable);
         }
     }
 }

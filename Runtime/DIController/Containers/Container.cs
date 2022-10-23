@@ -7,13 +7,48 @@ namespace MiniContainer
     {
         [SerializeField]
         private List<GameObject> _autoInjectGameObjects;
+        [SerializeField]
+        private List<GameObject> _autoRegisterGameObjects;
 
         protected IContainer DIContainer { get; set; }
 
         protected virtual void Register() { }
 
         protected virtual void Resolve() { }
-        
+
+        protected void AutoRegisterAll()
+        {
+            if (_autoRegisterGameObjects == null)
+                return;
+
+            foreach (var target in _autoRegisterGameObjects)
+            {
+                if (target != null) // Check missing reference
+                {
+                    RegisterGameObject(target);
+                }
+            }
+        }
+
+        private void RegisterGameObject(GameObject go)
+        {
+            var buffer = ObjectListBuffer<MonoBehaviour>.Get();
+
+            if (go == null) return;
+
+            buffer.Clear();
+            go.GetComponents(buffer);
+            foreach (var monoBehaviour in buffer)
+            {
+                if (monoBehaviour is IRegistrable registrable)
+                {
+                    DoRegister(registrable);
+                }
+            }
+        }
+
+        protected abstract void DoRegister(IRegistrable registrable);
+
         protected void AutoInjectAll()
         {
             if (_autoInjectGameObjects == null)
