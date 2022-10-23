@@ -27,6 +27,10 @@ namespace MiniContainer
                 {
                     RegisterGameObject(target);
                 }
+                else
+                {
+                    Debug.LogError("IRegistrable not found");
+                }
             }
         }
 
