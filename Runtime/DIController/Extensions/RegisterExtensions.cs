@@ -47,9 +47,6 @@ namespace MiniContainer
             diService.Register(dependencyObject);
         }
 
-        /// <summary>
-        /// Store an instance from an implemented class
-        /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void RegisterInstance<TService>(this IDIService diService,
             TService implementation)
@@ -58,9 +55,6 @@ namespace MiniContainer
             diService.Register(instanceRegistrationDependencyObject);
         }
 
-        /// <summary>
-        /// Store an instance from an implemented class
-        /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void RegisterInstanceAsSelf(this IDIService diService,
             object implementation)
@@ -119,9 +113,6 @@ namespace MiniContainer
             diService.Register(dependencyObject);
         }
 
-        /// <summary>
-        /// Store an instance from an implemented class
-        /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void RegisterInstance<TService>(this IBaseDIService diService, 
             TService implementation)
@@ -130,9 +121,6 @@ namespace MiniContainer
             diService.Register(instanceRegistrationDependencyObject);
         }
 
-        /// <summary>
-        /// Store an instance from an implemented class
-        /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void RegisterInstanceAsSelf(this IBaseDIService diService,
             object implementation)
