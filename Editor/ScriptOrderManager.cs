@@ -9,7 +9,7 @@ namespace MiniContainer.Editor
     {
         static ScriptOrderManager()
         {
-            foreach (MonoScript monoScript in MonoImporter.GetAllRuntimeMonoScripts())
+            foreach (var monoScript in MonoImporter.GetAllRuntimeMonoScripts())
             {
                 if (monoScript.GetClass() == null) continue;
                 foreach (var a in Attribute.GetCustomAttributes(monoScript.GetClass(), typeof(DefaultExecutionOrder)))

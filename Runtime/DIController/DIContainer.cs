@@ -162,7 +162,7 @@ namespace MiniContainer
         {
             if (!_serviceDictionary.TryGetValue(serviceType, out var dependencyObject))
             {
-                throw new Exception($"Service of type {serviceType} is not found");
+                throw new Exception($"Service {_objectGraph.Last().DeclaringType} tried to find dependency but service of type {serviceType} is not found.");
             }
 
             if (dependencyObject is ComponentDependencyObject)
