@@ -1,5 +1,8 @@
-﻿namespace MiniContainer
+﻿using UnityEngine;
+
+namespace MiniContainer
 {
+    [DefaultExecutionOrder(-6500)]
     public abstract class RootContainer : Container
     {
         protected IDIService DIService { get; private set; }
