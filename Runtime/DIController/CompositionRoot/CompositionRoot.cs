@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
@@ -57,7 +58,13 @@ namespace MiniContainer
             _diService = new DIService();
             _container = _diService.GenerateContainer();
             foreach (var rootContainer in _rootContainers)
+            {
+                if (rootContainer == null)
+                {
+                    throw new NullReferenceException("Root container should not be null! Check CompositionRoot in the inspector!");
+                }
                 rootContainer.Init(_diService, _container);
+            }
 
             SceneManager.sceneLoaded += OnSceneLoaded;
             SceneManager.sceneUnloaded += OnSceneUnloaded;
