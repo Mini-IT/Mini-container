@@ -4,13 +4,6 @@ using UnityEngine;
 
 namespace MiniContainer
 {
-    public enum RegistrationType
-    {
-        Base,
-        Component,
-        Instance
-    }
-
     public class Registration
     {
         public RegistrationType RegistrationType { get; internal set; }
@@ -25,7 +18,7 @@ namespace MiniContainer
 
         public object Implementation { get; internal set; }
 
-        public List<Type> InterfaceTypes { get; internal set; }
+        public List<Type> InterfaceTypes { get; private set; }
 
         public ServiceLifeTime LifeTime { get; internal set; }
 
@@ -95,7 +88,9 @@ namespace MiniContainer
 
             InterfaceTypes ??= new List<Type>();
             if (!InterfaceTypes.Contains(interfaceType))
+            {
                 InterfaceTypes.Add(interfaceType);
+            }
         }
     }
 }
