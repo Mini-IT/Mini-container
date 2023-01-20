@@ -53,8 +53,7 @@ namespace MiniContainer
                                     break;
                                 case RegistrationType.Instance:
                                     dependencyObject = new InstanceRegistrationDependencyObject(
-                                        _registrations[i]
-                                            .InterfaceTypes[j],
+                                        _registrations[i].InterfaceTypes[j],
                                         _registrations[i].ImplementationType,
                                         _registrations[i].Implementation,
                                         _registrations[i].LifeTime,
@@ -73,7 +72,7 @@ namespace MiniContainer
 
                     _registrations.Clear();
                 }
-                
+
                 return _serviceDictionary;
             }
         }
@@ -234,7 +233,7 @@ namespace MiniContainer
                 {
                     throw new Exception($"There is no such a service {serviceType} registered");
                 }
-                throw new Exception($"{_objectGraph.LastOrDefault()?.DeclaringType} tried to find {serviceType} but dependency is not found.");
+                throw new Exception($"{obj.DeclaringType} tried to find {serviceType} but dependency is not found.");
             }
 
             if (dependencyObject is ComponentDependencyObject)
@@ -350,12 +349,10 @@ namespace MiniContainer
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Release(Type type)
         {
-
             if (!ServiceDictionary.TryGetValue(type, out var value)) return;
             if (value.Implementation == null) return;
             ReleaseObject(value);
             ServiceDictionary.TryRemove(type, out _);
-
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
