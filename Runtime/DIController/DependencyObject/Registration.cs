@@ -88,12 +88,9 @@ namespace MiniContainer
 
         private void AddInterfaceType(Type interfaceType)
         {
-            if (interfaceType.IsAbstract || interfaceType.IsInterface)
+            if (!interfaceType.IsAssignableFrom(ImplementationType))
             {
-                if (!interfaceType.IsAssignableFrom(ImplementationType))
-                {
-                    throw new Exception($"{ImplementationType} is not assignable from {interfaceType}");
-                }
+                throw new Exception($"{ImplementationType} is not assignable from {interfaceType}");
             }
 
             InterfaceTypes ??= new List<Type>();
