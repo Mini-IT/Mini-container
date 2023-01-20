@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace MiniContainer
@@ -9,18 +10,12 @@ namespace MiniContainer
         public Transform Parent { get; }
         public string GameObjectName { get; }
 
-        public ComponentDependencyObject(Component prefab, Transform parent, Type serviceType, bool onSceneDestroyRelease) 
-            : base(serviceType, onSceneDestroyRelease)
+        public ComponentDependencyObject(Type serviceType, Type implementationType, object implementation, ServiceLifeTime lifeTime, List<Type> interfaceTypes, bool onSceneDestroyRelease, Component prefab, Transform parent, string gameObjectName) 
+            : base(serviceType, implementationType, implementation, lifeTime, interfaceTypes, onSceneDestroyRelease)
         {
             Prefab = prefab;
             Parent = parent;
-        }
-
-        public ComponentDependencyObject(string gameObjectName, Transform parent, Type serviceType, bool onSceneDestroyRelease)
-            : base(serviceType, onSceneDestroyRelease)
-        {
             GameObjectName = gameObjectName;
-            Parent = parent;
         }
     }
 }

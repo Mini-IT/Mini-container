@@ -8,134 +8,229 @@ namespace MiniContainer
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
 
-        public static void RegisterComponentInNewPrefab<TService>(
+        public static Registration RegisterComponentInNewPrefab<TService>(
             this IDIService diService,
             TService prefab, 
             Transform parent = null)
             where TService : Component
         {
-            var componentDependencyObject = new ComponentDependencyObject(prefab, parent, prefab.GetType(), false);
+            var registration = new Registration();
+            registration.ImplementationType = prefab.GetType();
+            registration.As(prefab.GetType());
+            registration.RegistrationType = RegistrationType.Component;
+            registration.LifeTime = ServiceLifeTime.Transient;
+            registration.OnSceneDestroyRelease = false;
+            registration.Prefab = prefab;
+            registration.Parent = parent;
 
-            diService.Register(componentDependencyObject);
+            return diService.Register(registration);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void RegisterComponentOnNewGameObject<TService>(
+        public static Registration RegisterComponentOnNewGameObject<TService>(
             this IDIService diService,
             Transform parent = null,
             string newGameObjectName = null)
             where TService : Component
         {
-            var componentDependencyObject = new ComponentDependencyObject(newGameObjectName, parent, typeof(TService), false);
-            diService.Register(componentDependencyObject);
+            var registration = new Registration();
+            registration.ImplementationType = typeof(TService);
+            registration.As<TService>();
+            registration.RegistrationType = RegistrationType.Component;
+            registration.LifeTime = ServiceLifeTime.Transient;
+            registration.OnSceneDestroyRelease = false;
+            registration.GameObjectName = newGameObjectName;
+            registration.Parent = parent;
+
+            return diService.Register(registration);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void Register<TService>(this IDIService diService,
+        public static Registration Register<TService>(this IDIService diService,
             ServiceLifeTime serviceLifeTime = ServiceLifeTime.Singleton)
         {
-            var dependencyObject = new DependencyObject(typeof(TService), serviceLifeTime, false);
-            diService.Register(dependencyObject);
+            var registration = new Registration();
+            registration.ImplementationType = typeof(TService);
+            registration.As<TService>();
+            registration.RegistrationType = RegistrationType.Base;
+            registration.LifeTime = serviceLifeTime;
+            registration.OnSceneDestroyRelease = false;
+
+            return diService.Register(registration);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void Register(this IDIService diService, 
+        public static Registration Register(this IDIService diService, 
             Type type, 
             ServiceLifeTime serviceLifeTime = ServiceLifeTime.Singleton)
         {
-            var dependencyObject = new DependencyObject(type, serviceLifeTime, false);
-            diService.Register(dependencyObject);
+            var registration = new Registration();
+            registration.ImplementationType = type;
+            registration.As(type);
+            registration.RegistrationType = RegistrationType.Base;
+            registration.LifeTime = serviceLifeTime;
+            registration.OnSceneDestroyRelease = false;
+
+            return diService.Register(registration);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void RegisterInstance<TService>(this IDIService diService,
+        public static Registration RegisterInstance<TService>(this IDIService diService,
             TService implementation)
         {
-            var instanceRegistrationDependencyObject = new InstanceRegistrationDependencyObject(typeof(TService), implementation, false);
-            diService.Register(instanceRegistrationDependencyObject);
+            var registration = new Registration();
+            registration.ImplementationType = typeof(TService);
+            registration.As<TService>();
+            registration.RegistrationType = RegistrationType.Instance;
+            registration.LifeTime = ServiceLifeTime.Singleton;
+            registration.OnSceneDestroyRelease = false;
+            registration.Implementation = implementation;
+
+            return diService.Register(registration);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void RegisterInstanceAsSelf(this IDIService diService,
+        public static Registration RegisterInstanceAsSelf(this IDIService diService,
             object implementation)
         {
-            var instanceRegistrationDependencyObject = new InstanceRegistrationDependencyObject(implementation.GetType(), implementation, false);
-            diService.Register(instanceRegistrationDependencyObject);
+            var registration = new Registration();
+            registration.ImplementationType = implementation.GetType();
+            registration.As(implementation.GetType());
+            registration.RegistrationType = RegistrationType.Instance;
+            registration.LifeTime = ServiceLifeTime.Singleton;
+            registration.OnSceneDestroyRelease = false;
+            registration.Implementation = implementation;
+
+            return diService.Register(registration);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void Register<TService, TImplementation>(this IDIService diService, 
+        public static Registration Register<TService, TImplementation>(this IDIService diService, 
             ServiceLifeTime serviceLifeTime = ServiceLifeTime.Singleton) 
             where TImplementation : class, TService
         {
-            var dependencyObject = new DependencyObject(typeof(TService), typeof(TImplementation), serviceLifeTime, false);
-            diService.Register(dependencyObject);
+            var registration = new Registration();
+            registration.ImplementationType = typeof(TImplementation);
+            registration.As<TService>();
+            registration.RegistrationType = RegistrationType.Base;
+            registration.LifeTime = serviceLifeTime;
+            registration.OnSceneDestroyRelease = false;
+
+            return diService.Register(registration);
         }
-
+        
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-
-        public static void RegisterComponentInNewPrefab<TService>(
+        public static Registration RegisterComponentInNewPrefab<TService>(
             this IBaseDIService diService,
             TService prefab,
             Transform parent = null)
             where TService : Component
         {
-            var componentDependencyObject = new ComponentDependencyObject(prefab, parent, prefab.GetType(), true);
 
-            diService.Register(componentDependencyObject);
+            var registration = new Registration();
+            registration.ImplementationType = prefab.GetType();
+            registration.As(prefab.GetType());
+            registration.RegistrationType = RegistrationType.Component;
+            registration.LifeTime = ServiceLifeTime.Transient;
+            registration.OnSceneDestroyRelease = true;
+            registration.Parent = parent;
+            registration.Prefab = prefab;
+
+            return diService.Register(registration);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void RegisterComponentOnNewGameObject<TService>(
+        public static Registration RegisterComponentOnNewGameObject<TService>(
             this IBaseDIService diService,
             Transform parent = null,
             string newGameObjectName = null)
             where TService : Component
         {
-            var componentDependencyObject = new ComponentDependencyObject(newGameObjectName, parent, typeof(TService), true);
-            diService.Register(componentDependencyObject);
+            var registration = new Registration();
+            registration.ImplementationType = typeof(TService);
+            registration.As<TService>();
+            registration.RegistrationType = RegistrationType.Component;
+            registration.LifeTime = ServiceLifeTime.Transient;
+            registration.OnSceneDestroyRelease = true;
+            registration.GameObjectName = newGameObjectName;
+            registration.Parent = parent;
+            
+            return diService.Register(registration);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void Register<TService>(this IBaseDIService diService,
+        public static Registration Register<TService>(this IBaseDIService diService,
             ServiceLifeTime serviceLifeTime = ServiceLifeTime.Singleton)
         {
-            var dependencyObject = new DependencyObject(typeof(TService), serviceLifeTime, true);
-            diService.Register(dependencyObject);
+            var registration = new Registration();
+            registration.ImplementationType = typeof(TService);
+            registration.As<TService>();
+            registration.RegistrationType = RegistrationType.Base;
+            registration.LifeTime = serviceLifeTime;
+            registration.OnSceneDestroyRelease = true;
+
+            return diService.Register(registration);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void Register(this IBaseDIService diService, 
+        public static Registration Register(this IBaseDIService diService, 
             Type type,
             ServiceLifeTime serviceLifeTime = ServiceLifeTime.Singleton)
         {
-            var dependencyObject = new DependencyObject(type, serviceLifeTime, true);
-            diService.Register(dependencyObject);
+            var registration = new Registration();
+            registration.ImplementationType = type;
+            registration.As(type);
+            registration.RegistrationType = RegistrationType.Base;
+            registration.LifeTime = serviceLifeTime;
+            registration.OnSceneDestroyRelease = true;
+
+            return diService.Register(registration);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void RegisterInstance<TService>(this IBaseDIService diService, 
+        public static Registration RegisterInstance<TService>(this IBaseDIService diService, 
             TService implementation)
         {
-            var instanceRegistrationDependencyObject = new InstanceRegistrationDependencyObject(typeof(TService), implementation, true);
-            diService.Register(instanceRegistrationDependencyObject);
+            var registration = new Registration();
+            registration.ImplementationType = typeof(TService);
+            registration.As<TService>();
+            registration.RegistrationType = RegistrationType.Instance;
+            registration.LifeTime = ServiceLifeTime.Singleton;
+            registration.OnSceneDestroyRelease = true;
+            registration.Implementation = implementation;
+
+            return diService.Register(registration);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void RegisterInstanceAsSelf(this IBaseDIService diService,
+        public static Registration RegisterInstanceAsSelf(this IBaseDIService diService,
             object implementation)
         {
-            var instanceRegistrationDependencyObject = new InstanceRegistrationDependencyObject(implementation.GetType(), implementation, true);
-            diService.Register(instanceRegistrationDependencyObject);
+            var registration = new Registration();
+            registration.ImplementationType = implementation.GetType();
+            registration.As(implementation.GetType());
+            registration.RegistrationType = RegistrationType.Instance;
+            registration.LifeTime = ServiceLifeTime.Singleton;
+            registration.OnSceneDestroyRelease = true;
+            registration.Implementation = implementation;
+
+            //var instanceRegistrationDependencyObject = new InstanceRegistrationDependencyObject(implementation.GetType(), implementation, true);
+            return diService.Register(registration);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void Register<TService, TImplementation>(this IBaseDIService diService, 
+        public static Registration Register<TService, TImplementation>(this IBaseDIService diService, 
             ServiceLifeTime serviceLifeTime = ServiceLifeTime.Singleton) 
             where TImplementation : class, TService
         {
-            var dependencyObject = new DependencyObject(typeof(TService), typeof(TImplementation), serviceLifeTime, true);
-            diService.Register(dependencyObject);
+            var registration = new Registration();
+            registration.ImplementationType = typeof(TImplementation);
+            registration.As<TService>();
+            registration.RegistrationType = RegistrationType.Base;
+            registration.LifeTime = serviceLifeTime;
+            registration.OnSceneDestroyRelease = false;
+
+            return diService.Register(registration);
         }
     }
 }

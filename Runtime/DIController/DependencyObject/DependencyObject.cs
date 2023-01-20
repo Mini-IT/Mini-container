@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 
 namespace MiniContainer
 {
@@ -7,6 +8,10 @@ namespace MiniContainer
         public Type ServiceType { get; }
 
         public Type ImplementationType { get; }
+
+        public bool OnSceneDestroyRelease { get; }
+
+        public List<Type> InterfaceTypes { get; }
 
         private object _implementation;
 
@@ -35,35 +40,13 @@ namespace MiniContainer
         public IDisposable Disposable { get; internal set; }
         public ServiceLifeTime LifeTime { get; }
 
-        public bool OnSceneDestroyRelease { get; }
-
-        protected DependencyObject(Type serviceType, object implementation, bool onSceneDestroyRelease)
-        {
-            Implementation = implementation;
-            ServiceType = serviceType;
-            OnSceneDestroyRelease = onSceneDestroyRelease;
-            LifeTime = ServiceLifeTime.Singleton;
-        }
-
-        protected DependencyObject(Type serviceType, bool onSceneDestroyRelease)
-        {
-            ServiceType = serviceType;
-            OnSceneDestroyRelease = onSceneDestroyRelease;
-            LifeTime = ServiceLifeTime.Transient;
-        }
-
-        public DependencyObject(Type serviceType, ServiceLifeTime lifeTime, bool onSceneDestroyRelease)
-        {
-            ServiceType = serviceType;
-            LifeTime = lifeTime;
-            OnSceneDestroyRelease = onSceneDestroyRelease;
-        }
-
-        public DependencyObject(Type serviceType, Type implementationType, ServiceLifeTime lifeTime, bool onSceneDestroyRelease)
+        public DependencyObject(Type serviceType, Type implementationType, object implementation, ServiceLifeTime lifeTime, List<Type> interfaceTypes, bool onSceneDestroyRelease)
         {
             ServiceType = serviceType;
             LifeTime = lifeTime;
             ImplementationType = implementationType;
+            Implementation = implementation;
+            InterfaceTypes = interfaceTypes;
             OnSceneDestroyRelease = onSceneDestroyRelease;
         }
     }

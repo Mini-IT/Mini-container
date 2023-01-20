@@ -2,6 +2,6 @@
 {
     public interface IBaseDIService
     {
-        void Register<T>(T dependencyObject) where T : DependencyObject;
+        T Register<T>(T registration) where T : Registration;
     }
 }

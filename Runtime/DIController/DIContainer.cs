@@ -5,25 +5,92 @@ using System.Linq;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using UnityEngine;
-using Debug = UnityEngine.Debug;
 
 namespace MiniContainer
 {
     public class DIContainer : IContainer
     {
-        private readonly List<ConstructorInfo> _objectGraph;
-        private readonly ConcurrentDictionary<Type, DependencyObject> _serviceDictionary;
+        private ConcurrentDictionary<Type, DependencyObject> _serviceDictionary;
+        private ConcurrentDictionary<Type, DependencyObject> ServiceDictionary
+        {
+            get
+            {
+                if (_serviceDictionary == null)
+                {
+                    _serviceDictionary = new ConcurrentDictionary<Type, DependencyObject>();
+                }
 
-        public DIContainer(ConcurrentDictionary<Type, DependencyObject> serviceDictionary)
+                if (_registrations.Count > 0)
+                {
+                    for (var i = 0; i < _registrations.Count; i++)
+                    {
+                        for (var j = 0; j < _registrations[i].InterfaceTypes.Count; j++)
+                        {
+                            DependencyObject dependencyObject = null;
+                            switch (_registrations[i].RegistrationType)
+                            {
+                                case RegistrationType.Base:
+                                    dependencyObject = new DependencyObject(
+                                        _registrations[i].InterfaceTypes[j],
+                                            _registrations[i].ImplementationType,
+                                            _registrations[i].Implementation,
+                                            _registrations[i].LifeTime,
+                                            _registrations[i].InterfaceTypes,
+                                            _registrations[i].OnSceneDestroyRelease);
+
+                                    break;
+                                case RegistrationType.Component:
+                                    dependencyObject = new ComponentDependencyObject(
+                                        _registrations[i].InterfaceTypes[j],
+                                        _registrations[i].ImplementationType,
+                                        _registrations[i].Implementation,
+                                        _registrations[i].LifeTime,
+                                        _registrations[i].InterfaceTypes,
+                                        _registrations[i].OnSceneDestroyRelease,
+                                        _registrations[i].Prefab,
+                                        _registrations[i].Parent,
+                                        _registrations[i].GameObjectName);
+                                    break;
+                                case RegistrationType.Instance:
+                                    dependencyObject = new InstanceRegistrationDependencyObject(
+                                        _registrations[i]
+                                            .InterfaceTypes[j],
+                                        _registrations[i].ImplementationType,
+                                        _registrations[i].Implementation,
+                                        _registrations[i].LifeTime,
+                                        _registrations[i].InterfaceTypes,
+                                        _registrations[i].OnSceneDestroyRelease);
+                                    break;
+                            }
+
+                            if (dependencyObject == null) continue;
+                            if (!_serviceDictionary.TryAdd(dependencyObject.ServiceType, dependencyObject))
+                            {
+                                throw new Exception($"Already exist {dependencyObject.ServiceType}");
+                            }
+                        }
+                    }
+
+                    _registrations.Clear();
+                }
+                
+                return _serviceDictionary;
+            }
+        }
+
+        private readonly List<ConstructorInfo> _objectGraph;
+        private readonly List<Registration> _registrations;
+
+        public DIContainer(List<Registration> registrations)
         {
             _objectGraph = new List<ConstructorInfo>();
-            _serviceDictionary = serviceDictionary;
+            _registrations = registrations;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void ResolveInstanceRegistered(bool onSceneDestroyRelease)
         {
-            foreach (var dependencyObject in _serviceDictionary)
+            foreach (var dependencyObject in ServiceDictionary)
             {
                 if (dependencyObject.Value is InstanceRegistrationDependencyObject
                     && dependencyObject.Value.OnSceneDestroyRelease == onSceneDestroyRelease)
@@ -52,8 +119,8 @@ namespace MiniContainer
                 {
                     var name = string.IsNullOrEmpty(componentDependencyObject.GameObjectName)
                         ? componentDependencyObject.ServiceType.Name
-                        : componentDependencyObject.GameObjectName; 
-                    
+                        : componentDependencyObject.GameObjectName;
+
                     var go = new GameObject(name);
                     go.SetActive(false);
 
@@ -154,15 +221,20 @@ namespace MiniContainer
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public object GetInstance(Type serviceType)
         {
-            return !_serviceDictionary.TryGetValue(serviceType, out var dependencyObject) ? null : dependencyObject.Implementation;
+            return !ServiceDictionary.TryGetValue(serviceType, out var dependencyObject) ? null : dependencyObject.Implementation;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private DependencyObject ResolveType(Type serviceType)
         {
-            if (!_serviceDictionary.TryGetValue(serviceType, out var dependencyObject))
+            if (!ServiceDictionary.TryGetValue(serviceType, out var dependencyObject))
             {
-                throw new Exception($"{_objectGraph.Last().DeclaringType} tried to find {serviceType} but dependency is not found.");
+                var obj = _objectGraph.LastOrDefault();
+                if (obj == null)
+                {
+                    throw new Exception($"There is no such a service {serviceType} registered");
+                }
+                throw new Exception($"{_objectGraph.LastOrDefault()?.DeclaringType} tried to find {serviceType} but dependency is not found.");
             }
 
             if (dependencyObject is ComponentDependencyObject)
@@ -172,7 +244,10 @@ namespace MiniContainer
 
             if (dependencyObject.LifeTime == ServiceLifeTime.Singleton)
             {
-                if (dependencyObject.Implementation != null) return dependencyObject;
+                if (TryToGetSingletonImpl(dependencyObject))
+                {
+                    return dependencyObject;
+                }
             }
             else
             {
@@ -180,7 +255,7 @@ namespace MiniContainer
                 dependencyObject.Implementation = null;
             }
 
-            var actualType = dependencyObject.ImplementationType ?? dependencyObject.ServiceType;
+            var actualType = dependencyObject.ImplementationType;
 
             if (actualType.IsAbstract || actualType.IsInterface)
             {
@@ -210,7 +285,6 @@ namespace MiniContainer
                 var implementation = Activator.CreateInstance(actualType, parameters);
                 CheckInterfaces(implementation, dependencyObject);
                 dependencyObject.Implementation = implementation;
-
                 _objectGraph.Clear();
                 return dependencyObject;
             }
@@ -219,6 +293,29 @@ namespace MiniContainer
                 throw new Exception($"{e.Message}");
             }
 
+        }
+
+        private bool TryToGetSingletonImpl(DependencyObject dependencyObject)
+        {
+            if (dependencyObject.Implementation != null)
+            {
+                return true;
+            }
+
+            for (var i = 0; i < dependencyObject.InterfaceTypes.Count; i++)
+            {
+                var impl = ServiceDictionary[dependencyObject.InterfaceTypes[i]].Implementation;
+                if (impl != null)
+                {
+                    for (var j = 0; j < dependencyObject.InterfaceTypes.Count; j++)
+                    {
+                        ServiceDictionary[dependencyObject.InterfaceTypes[j]].Implementation = impl;
+                    }
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -254,17 +351,17 @@ namespace MiniContainer
         public void Release(Type type)
         {
 
-            if (!_serviceDictionary.TryGetValue(type, out var value)) return;
+            if (!ServiceDictionary.TryGetValue(type, out var value)) return;
             if (value.Implementation == null) return;
             ReleaseObject(value);
-            _serviceDictionary.TryRemove(type, out _);
+            ServiceDictionary.TryRemove(type, out _);
 
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void ReleaseObject(DependencyObject dependencyObject)
         {
-            foreach (var service in _serviceDictionary)
+            foreach (var service in ServiceDictionary)
             {
                 if (service.Value.Implementation == null) continue;
                 var fields = service.Value.Implementation.GetType()
@@ -286,7 +383,7 @@ namespace MiniContainer
         public void ReleaseAll()
         {
 
-            foreach (var dependencyObject in _serviceDictionary)
+            foreach (var dependencyObject in ServiceDictionary)
             {
                 if (dependencyObject.Value.Implementation == null || dependencyObject.Value.Implementation is MonoBehaviour)
                     continue;
@@ -294,7 +391,7 @@ namespace MiniContainer
                 dependencyObject.Value.Disposable?.Dispose();
                 dependencyObject.Value.Implementation = null;
             }
-            _serviceDictionary.Clear();
+            ServiceDictionary.Clear();
 
 
             _objectGraph.Clear();
@@ -303,13 +400,13 @@ namespace MiniContainer
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void ReleaseScene()
         {
-            foreach (var dependencyObject in _serviceDictionary)
+            foreach (var dependencyObject in ServiceDictionary)
             {
                 if (dependencyObject.Value.Implementation == null || dependencyObject.Value.Implementation is MonoBehaviour || !dependencyObject.Value.OnSceneDestroyRelease)
                     continue;
 
                 ReleaseObject(dependencyObject.Value);
-                _serviceDictionary.TryRemove(dependencyObject.Key, out _);
+                ServiceDictionary.TryRemove(dependencyObject.Key, out _);
             }
 
         }
@@ -317,7 +414,7 @@ namespace MiniContainer
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void RunUpdate()
         {
-            foreach (var dependencyObject in _serviceDictionary)
+            foreach (var dependencyObject in ServiceDictionary)
             {
                 dependencyObject.Value.ContainerUpdate?.Update();
             }
@@ -327,7 +424,7 @@ namespace MiniContainer
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void RunSceneLoaded(int scene)
         {
-            foreach (var dependencyObject in _serviceDictionary)
+            foreach (var dependencyObject in ServiceDictionary)
             {
                 dependencyObject.Value.ContainerSceneLoaded?.OnSceneLoaded(scene);
             }
@@ -337,7 +434,7 @@ namespace MiniContainer
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void RunSceneUnloaded(int scene)
         {
-            foreach (var dependencyObject in _serviceDictionary)
+            foreach (var dependencyObject in ServiceDictionary)
             {
                 dependencyObject.Value.ContainerSceneUnloaded?.OnSceneUnloaded(scene);
             }
@@ -347,7 +444,7 @@ namespace MiniContainer
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void RunApplicationFocus(bool focus)
         {
-            foreach (var dependencyObject in _serviceDictionary)
+            foreach (var dependencyObject in ServiceDictionary)
             {
                 dependencyObject.Value.ContainerApplicationFocus?.OnApplicationFocus(focus);
             }
@@ -357,7 +454,7 @@ namespace MiniContainer
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void RunApplicationPause(bool pause)
         {
-            foreach (var dependencyObject in _serviceDictionary)
+            foreach (var dependencyObject in ServiceDictionary)
             {
                 dependencyObject.Value.ContainerApplicationPause?.OnApplicationPause(pause);
             }

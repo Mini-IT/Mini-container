@@ -1,30 +1,29 @@
 ﻿using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 
 namespace MiniContainer
 {
     public class DIService : IDIService
     {
-        private readonly ConcurrentDictionary<Type, DependencyObject> _serviceDictionary;
+        private readonly List<Registration> _registrations;
 
         public DIService()
         {
-            _serviceDictionary = new ConcurrentDictionary<Type, DependencyObject>();
+            _registrations = new List<Registration>();
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Register<T>(T dependencyObject) where T : DependencyObject
+        public T Register<T>(T registration) where T : Registration
         {
-            if (!_serviceDictionary.TryAdd(dependencyObject.ServiceType, dependencyObject))
-            {
-                throw new Exception($"Already exist {dependencyObject.ServiceType}");
-            }
+            _registrations.Add(registration);
+            return registration;
         }
 
         public DIContainer GenerateContainer()
         {
-            return new DIContainer(_serviceDictionary);
+            return new DIContainer(_registrations);
         }
     }
 }

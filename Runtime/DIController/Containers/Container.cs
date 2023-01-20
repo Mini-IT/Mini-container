@@ -10,7 +10,7 @@ namespace MiniContainer
 
         [SerializeField]
         private List<GameObject> _autoResolveGameObjects;
-
+        
         protected IContainer DIContainer { get; set; }
 
         protected virtual void Register() { }
@@ -27,10 +27,6 @@ namespace MiniContainer
                 if (target != null) // Check missing reference
                 {
                     RegisterGameObject(target);
-                }
-                else
-                {
-                    Debug.LogError("IRegistrable not found");
                 }
             }
         }
@@ -49,11 +45,15 @@ namespace MiniContainer
                 {
                     DoRegister(registrable);
                 }
+                else
+                {
+                    Debug.LogError("IRegistrable not found");
+                }
             }
         }
 
         protected abstract void DoRegister(IRegistrable registrable);
-
+        
         protected void AutoResolveAll()
         {
             if (_autoResolveGameObjects == null)
