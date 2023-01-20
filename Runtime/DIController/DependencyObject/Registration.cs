@@ -61,7 +61,6 @@ namespace MiniContainer
         {
             if (interfaces[i] != typeof(IContainerUpdateListener) &&
                 interfaces[i] != typeof(IContainerSceneLoadedListener) &&
-                interfaces[i] != typeof(IContainerSceneLoadedListener) &&
                 interfaces[i] != typeof(IContainerSceneUnloadedListener) &&
                 interfaces[i] != typeof(IContainerApplicationFocusListener) &&
                 interfaces[i] != typeof(IContainerApplicationPauseListener) &&
@@ -73,7 +72,6 @@ namespace MiniContainer
             interfaces.Remove(interfaces[i]);
             i--;
             return i;
-
         }
 
         public Registration As(Type interfaceType)
