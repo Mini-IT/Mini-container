@@ -47,7 +47,7 @@ namespace MiniContainer
                 }
                 else
                 {
-                    Debug.LogError("IRegistrable not found");
+                    Debug.LogError($"AutoRegisterGameObject cannot be registered because {monoBehaviour.GetType()} doesn't implement IRegistrable");
                 }
             }
         }
