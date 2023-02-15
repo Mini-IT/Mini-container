@@ -45,10 +45,10 @@ namespace MiniContainer
                 {
                     DoRegister(registrable);
                 }
-                else
-                {
-                    Debug.LogError($"AutoRegisterGameObject cannot be registered because {monoBehaviour.GetType()} doesn't implement IRegistrable");
-                }
+                //else
+                //{
+                //    Debug.LogError($"AutoRegisterGameObject cannot be registered because {monoBehaviour.GetType()} doesn't implement IRegistrable");
+                //}
             }
         }
 
