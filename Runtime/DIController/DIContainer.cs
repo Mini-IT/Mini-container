@@ -272,26 +272,18 @@ namespace MiniContainer
                 constructorInfo = actualType.GetConstructors().First();
             }
 
-            try
-            {
-                if (_objectGraph.Any(c => c.GetHashCode() == constructorInfo.GetHashCode()))
-                    throw new Exception($"{constructorInfo.DeclaringType} has circular dependency!");
+            if (_objectGraph.Any(c => c.GetHashCode() == constructorInfo.GetHashCode()))
+                throw new Exception($"{constructorInfo.DeclaringType} has circular dependency!");
 
-                _objectGraph.Add(constructorInfo);
+            _objectGraph.Add(constructorInfo);
 
-                var parameters = constructorInfo.GetParameters().Select(p => ResolveType(p.ParameterType).Implementation).ToArray();
+            var parameters = constructorInfo.GetParameters().Select(p => ResolveType(p.ParameterType).Implementation).ToArray();
 
-                var implementation = Activator.CreateInstance(actualType, parameters);
-                CheckInterfaces(implementation, dependencyObject);
-                dependencyObject.Implementation = implementation;
-                _objectGraph.Clear();
-                return dependencyObject;
-            }
-            catch (Exception e)
-            {
-                throw new Exception($"{e.Message}");
-            }
-
+            var implementation = Activator.CreateInstance(actualType, parameters);
+            CheckInterfaces(implementation, dependencyObject);
+            dependencyObject.Implementation = implementation;
+            _objectGraph.Clear();
+            return dependencyObject;
         }
 
         private bool TryToGetSingletonImpl(DependencyObject dependencyObject)
