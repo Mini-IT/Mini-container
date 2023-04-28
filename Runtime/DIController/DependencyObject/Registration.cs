@@ -48,30 +48,8 @@ namespace MiniContainer
             InterfaceTypes ??= new List<Type>();
             var interfaces = ImplementationType.GetInterfaces().ToList();
 
-            for (var i = 0; i < interfaces.Count; i++)
-            {
-                i = CheckInterface(interfaces, i);
-            }
-
             InterfaceTypes.AddRange(interfaces);
             return this;
-        }
-
-        private static int CheckInterface(IList<Type> interfaces, int i)
-        {
-            if (interfaces[i] != typeof(IContainerUpdateListener) &&
-                interfaces[i] != typeof(IContainerSceneLoadedListener) &&
-                interfaces[i] != typeof(IContainerSceneUnloadedListener) &&
-                interfaces[i] != typeof(IContainerApplicationFocusListener) &&
-                interfaces[i] != typeof(IContainerApplicationPauseListener) &&
-                interfaces[i] != typeof(IDisposable))
-            {
-                return i;
-            }
-
-            interfaces.Remove(interfaces[i]);
-            i--;
-            return i;
         }
 
         public Registration As(Type interfaceType)

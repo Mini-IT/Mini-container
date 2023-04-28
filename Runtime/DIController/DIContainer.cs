@@ -10,6 +10,8 @@ namespace MiniContainer
 {
     public class DIContainer : IContainer
     {
+        private readonly List<Type> _exceptionInterfaceList;
+
         private ConcurrentDictionary<Type, DependencyObject> _serviceDictionary;
         private ConcurrentDictionary<Type, DependencyObject> ServiceDictionary
         {
@@ -26,6 +28,14 @@ namespace MiniContainer
                     {
                         for (var j = 0; j < _registrations[i].InterfaceTypes.Count; j++)
                         {
+                            var interfaceType = _registrations[i].InterfaceTypes[j];
+                            if (_exceptionInterfaceList.Any(t => t == interfaceType))
+                            {
+                                _registrations[i].InterfaceTypes.Remove(interfaceType);
+                                j--;
+                                continue;
+                            }
+
                             DependencyObject dependencyObject = null;
                             switch (_registrations[i].RegistrationType)
                             {
@@ -82,8 +92,23 @@ namespace MiniContainer
 
         public DIContainer(List<Registration> registrations)
         {
+            _exceptionInterfaceList = new List<Type>()
+            {
+                typeof(IContainerUpdateListener),
+                typeof(IContainerSceneLoadedListener),
+                typeof(IContainerSceneUnloadedListener),
+                typeof(IContainerApplicationFocusListener),
+                typeof(IContainerApplicationPauseListener),
+                typeof(IDisposable)
+            };
+
             _objectGraph = new List<ConstructorInfo>();
             _registrations = registrations;
+        }
+
+        public void AddExceptionInterfaces(IEnumerable<Type> list)
+        {
+            _exceptionInterfaceList.AddRange(list);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

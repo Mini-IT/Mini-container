@@ -15,12 +15,12 @@ namespace MiniContainer
             Register();
             container.ResolveInstanceRegistered(true);
             Resolve();
+            AutoResolveAll();
         }
 
         private void Awake()
         {
             CompositionRoot.Instance.SubContainerInit(this);
-            AutoResolveAll();
         }
 
         protected override void DoRegister(IRegistrable registrable)
