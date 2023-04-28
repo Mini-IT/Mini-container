@@ -17,10 +17,7 @@ namespace MiniContainer
         {
             get
             {
-                if (_serviceDictionary == null)
-                {
-                    _serviceDictionary = new ConcurrentDictionary<Type, DependencyObject>();
-                }
+                _serviceDictionary ??= new ConcurrentDictionary<Type, DependencyObject>();
 
                 if (_registrations.Count > 0)
                 {
