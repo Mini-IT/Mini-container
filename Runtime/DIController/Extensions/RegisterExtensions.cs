@@ -46,7 +46,8 @@ namespace MiniContainer
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static Registration Register<TService>(this IDIService diService,
+        public static Registration Register<TService>(
+            this IDIService diService,
             ServiceLifeTime serviceLifeTime = ServiceLifeTime.Singleton)
         {
             var registration = new Registration();
@@ -60,7 +61,8 @@ namespace MiniContainer
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static Registration Register(this IDIService diService,
+        public static Registration Register(
+            this IDIService diService,
             Type type,
             ServiceLifeTime serviceLifeTime = ServiceLifeTime.Singleton)
         {
@@ -75,7 +77,8 @@ namespace MiniContainer
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static Registration RegisterInstance<TService>(this IDIService diService,
+        public static Registration RegisterInstance<TService>(
+            this IDIService diService,
             TService implementation)
         {
             var registration = new Registration();
@@ -90,7 +93,8 @@ namespace MiniContainer
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static Registration RegisterInstanceAsSelf(this IDIService diService,
+        public static Registration RegisterInstanceAsSelf(
+            this IDIService diService,
             object implementation)
         {
             var registration = new Registration();
@@ -105,7 +109,8 @@ namespace MiniContainer
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static Registration Register<TService, TImplementation>(this IDIService diService,
+        public static Registration Register<TService, TImplementation>(
+            this IDIService diService,
             ServiceLifeTime serviceLifeTime = ServiceLifeTime.Singleton)
             where TImplementation : class, TService
         {
@@ -159,7 +164,8 @@ namespace MiniContainer
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static Registration Register<TService>(this IBaseDIService diService,
+        public static Registration Register<TService>(
+            this IBaseDIService diService,
             ServiceLifeTime serviceLifeTime = ServiceLifeTime.Singleton)
         {
             var registration = new Registration();
@@ -173,7 +179,8 @@ namespace MiniContainer
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static Registration Register(this IBaseDIService diService,
+        public static Registration Register(
+            this IBaseDIService diService,
             Type type,
             ServiceLifeTime serviceLifeTime = ServiceLifeTime.Singleton)
         {
@@ -188,7 +195,8 @@ namespace MiniContainer
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static Registration RegisterInstance<TService>(this IBaseDIService diService,
+        public static Registration RegisterInstance<TService>(
+            this IBaseDIService diService,
             TService implementation)
         {
             var registration = new Registration();
@@ -203,7 +211,8 @@ namespace MiniContainer
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static Registration RegisterInstanceAsSelf(this IBaseDIService diService,
+        public static Registration RegisterInstanceAsSelf(
+            this IBaseDIService diService,
             object implementation)
         {
             var registration = new Registration();
@@ -218,7 +227,8 @@ namespace MiniContainer
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static Registration Register<TService, TImplementation>(this IBaseDIService diService,
+        public static Registration Register<TService, TImplementation>(
+            this IBaseDIService diService,
             ServiceLifeTime serviceLifeTime = ServiceLifeTime.Singleton)
             where TImplementation : class, TService
         {
@@ -230,6 +240,12 @@ namespace MiniContainer
             registration.OnSceneDestroyRelease = false;
 
             return diService.Register(registration);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void IgnoreType<T>(this IBaseDIService diService)
+        {
+            diService.IgnoreType(typeof(T));
         }
     }
 }

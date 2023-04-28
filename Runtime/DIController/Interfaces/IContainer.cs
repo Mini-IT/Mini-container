@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
 
 namespace MiniContainer
 {
@@ -17,6 +16,5 @@ namespace MiniContainer
         void RunSceneUnloaded(int scene);
         void RunApplicationFocus(bool focus);
         void RunApplicationPause(bool pause);
-        void AddExceptionInterfaces(IEnumerable<Type> list);
     }
 }

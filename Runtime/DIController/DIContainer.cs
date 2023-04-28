@@ -10,7 +10,7 @@ namespace MiniContainer
 {
     public class DIContainer : IContainer
     {
-        private readonly List<Type> _exceptionInterfaceList;
+        private readonly List<Type> _ignoreTypeList;
 
         private ConcurrentDictionary<Type, DependencyObject> _serviceDictionary;
         private ConcurrentDictionary<Type, DependencyObject> ServiceDictionary
@@ -29,7 +29,7 @@ namespace MiniContainer
                         for (var j = 0; j < _registrations[i].InterfaceTypes.Count; j++)
                         {
                             var interfaceType = _registrations[i].InterfaceTypes[j];
-                            if (_exceptionInterfaceList.Any(t => t == interfaceType))
+                            if (_ignoreTypeList.Any(t => t == interfaceType))
                             {
                                 _registrations[i].InterfaceTypes.Remove(interfaceType);
                                 j--;
@@ -41,7 +41,7 @@ namespace MiniContainer
                             {
                                 case RegistrationType.Base:
                                     dependencyObject = new DependencyObject(
-                                        _registrations[i].InterfaceTypes[j],
+                                        interfaceType,
                                             _registrations[i].ImplementationType,
                                             _registrations[i].Implementation,
                                             _registrations[i].LifeTime,
@@ -51,7 +51,7 @@ namespace MiniContainer
                                     break;
                                 case RegistrationType.Component:
                                     dependencyObject = new ComponentDependencyObject(
-                                        _registrations[i].InterfaceTypes[j],
+                                        interfaceType,
                                         _registrations[i].ImplementationType,
                                         _registrations[i].Implementation,
                                         _registrations[i].LifeTime,
@@ -63,7 +63,7 @@ namespace MiniContainer
                                     break;
                                 case RegistrationType.Instance:
                                     dependencyObject = new InstanceRegistrationDependencyObject(
-                                        _registrations[i].InterfaceTypes[j],
+                                        interfaceType,
                                         _registrations[i].ImplementationType,
                                         _registrations[i].Implementation,
                                         _registrations[i].LifeTime,
@@ -90,25 +90,11 @@ namespace MiniContainer
         private readonly List<ConstructorInfo> _objectGraph;
         private readonly List<Registration> _registrations;
 
-        public DIContainer(List<Registration> registrations)
+        public DIContainer(List<Registration> registrations, List<Type> ignoreTypeList)
         {
-            _exceptionInterfaceList = new List<Type>()
-            {
-                typeof(IContainerUpdateListener),
-                typeof(IContainerSceneLoadedListener),
-                typeof(IContainerSceneUnloadedListener),
-                typeof(IContainerApplicationFocusListener),
-                typeof(IContainerApplicationPauseListener),
-                typeof(IDisposable)
-            };
-
             _objectGraph = new List<ConstructorInfo>();
+            _ignoreTypeList = ignoreTypeList;
             _registrations = registrations;
-        }
-
-        public void AddExceptionInterfaces(IEnumerable<Type> list)
-        {
-            _exceptionInterfaceList.AddRange(list);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

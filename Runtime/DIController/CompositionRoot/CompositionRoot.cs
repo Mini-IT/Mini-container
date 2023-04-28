@@ -18,10 +18,6 @@ namespace MiniContainer
         private IContainer _container;
         private IDIService _diService;
 
-        private List<Type> _exceptionInterfaceList = new()
-        {
-
-        };
 #pragma warning restore 0649
 
         private void Awake()
@@ -61,7 +57,6 @@ namespace MiniContainer
         {
             _diService = new DIService();
             _container = _diService.GenerateContainer();
-            _container.AddExceptionInterfaces(_exceptionInterfaceList);
 
             foreach (var rootContainer in _rootContainers)
             {
@@ -96,7 +91,6 @@ namespace MiniContainer
             _container?.RunSceneUnloaded(scene.buildIndex);
             _container?.ReleaseScene();
         }
-
 
         private void OnDestroy()
         {

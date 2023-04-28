@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 
 namespace MiniContainer
@@ -6,9 +7,19 @@ namespace MiniContainer
     public class DIService : IDIService
     {
         private readonly List<Registration> _registrations;
+        private readonly List<Type> _ignoreTypeList;
 
         public DIService()
         {
+            _ignoreTypeList = new List<Type>()
+            {
+                typeof(IContainerUpdateListener),
+                typeof(IContainerSceneLoadedListener),
+                typeof(IContainerSceneUnloadedListener),
+                typeof(IContainerApplicationFocusListener),
+                typeof(IContainerApplicationPauseListener),
+                typeof(IDisposable)
+            };
             _registrations = new List<Registration>();
         }
 
@@ -19,9 +30,15 @@ namespace MiniContainer
             return registration;
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void IgnoreType<T>(T type) where T : Type
+        {
+            _ignoreTypeList.Add(type);
+        }
+
         public DIContainer GenerateContainer()
         {
-            return new DIContainer(_registrations);
+            return new DIContainer(_registrations, _ignoreTypeList);
         }
     }
 }
