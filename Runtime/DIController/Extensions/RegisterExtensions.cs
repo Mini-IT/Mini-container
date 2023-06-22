@@ -114,6 +114,42 @@ namespace MiniContainer
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static Registration RegisterLazy<TService>(
+            this IDIService diService,
+            IContainer container)
+        {
+            diService.Register<TService>();
+            var lazy = new LazyService<TService>(container);
+            var registration = new Registration();
+            registration.ImplementationType = lazy.GetType();
+            registration.As<ILazyService<TService>>();
+            registration.RegistrationType = RegistrationType.Instance;
+            registration.LifeTime = ServiceLifeTime.Singleton;
+            registration.OnSceneDestroyRelease = false;
+            registration.Implementation = lazy;
+
+            return diService.Register(registration);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static Registration RegisterLazy<TService, TImplementation>(
+            this IDIService diService,
+            IContainer container) where TImplementation : class, TService
+        {
+            diService.Register<TService, TImplementation>();
+            var lazy = new LazyService<TService>(container);
+            var registration = new Registration();
+            registration.ImplementationType = lazy.GetType();
+            registration.As<ILazyService<TService>>();
+            registration.RegistrationType = RegistrationType.Instance;
+            registration.LifeTime = ServiceLifeTime.Singleton;
+            registration.OnSceneDestroyRelease = false;
+            registration.Implementation = lazy;
+
+            return diService.Register(registration);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static Registration Register<TService, TImplementation>(
             this IDIService diService,
             ServiceLifeTime serviceLifeTime = ServiceLifeTime.Singleton)
@@ -227,6 +263,42 @@ namespace MiniContainer
             registration.LifeTime = ServiceLifeTime.Singleton;
             registration.OnSceneDestroyRelease = true;
             registration.Implementation = implementation;
+
+            return diService.Register(registration);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static Registration RegisterLazy<TService>(
+            this IBaseDIService diService,
+            IContainer container)
+        {
+            diService.Register<TService>();
+            var lazy = new LazyService<TService>(container);
+            var registration = new Registration();
+            registration.ImplementationType = lazy.GetType();
+            registration.As<ILazyService<TService>>();
+            registration.RegistrationType = RegistrationType.Instance;
+            registration.LifeTime = ServiceLifeTime.Singleton;
+            registration.OnSceneDestroyRelease = false;
+            registration.Implementation = lazy;
+
+            return diService.Register(registration);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static Registration RegisterLazy<TService, TImplementation>(
+            this IBaseDIService diService,
+            IContainer container) where TImplementation : class, TService
+        {
+            diService.Register<TService, TImplementation>();
+            var lazy = new LazyService<TService>(container);
+            var registration = new Registration();
+            registration.ImplementationType = lazy.GetType();
+            registration.As<ILazyService<TService>>();
+            registration.RegistrationType = RegistrationType.Instance;
+            registration.LifeTime = ServiceLifeTime.Singleton;
+            registration.OnSceneDestroyRelease = false;
+            registration.Implementation = lazy;
 
             return diService.Register(registration);
         }

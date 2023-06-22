@@ -2,9 +2,9 @@
 {
     public class LazyService<T> : ILazyService<T>
     {
-        private readonly DIContainer _container;
+        private readonly IContainer _container;
 
-        public LazyService(DIContainer container)
+        public LazyService(IContainer container)
         {
             _container = container;
         }
