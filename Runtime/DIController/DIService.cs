@@ -6,7 +6,7 @@ namespace MiniContainer
 {
     public class DIService : IDIService
     {
-        private readonly List<Registration> _registrations;
+        private readonly List<IRegistration> _registrations;
         private readonly List<Type> _ignoreTypeList;
 
         public DIService()
@@ -20,11 +20,11 @@ namespace MiniContainer
                 typeof(IContainerApplicationPauseListener),
                 typeof(IDisposable)
             };
-            _registrations = new List<Registration>();
+            _registrations = new List<IRegistration>();
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public T Register<T>(T registration) where T : Registration
+        public T Register<T>(T registration) where T : IRegistration
         {
             _registrations.Add(registration);
             return registration;

@@ -2,6 +2,6 @@
 {
     public interface IBaseDIService
     {
-        T Register<T>(T registration) where T : Registration;
+        T Register<T>(T registration) where T : IRegistration;
     }
 }

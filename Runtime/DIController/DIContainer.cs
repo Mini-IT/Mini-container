@@ -85,9 +85,9 @@ namespace MiniContainer
         }
 
         private readonly List<ConstructorInfo> _objectGraph;
-        private readonly List<Registration> _registrations;
+        private readonly List<IRegistration> _registrations;
 
-        public DIContainer(List<Registration> registrations, List<Type> ignoreTypeList)
+        public DIContainer(List<IRegistration> registrations, List<Type> ignoreTypeList)
         {
             _objectGraph = new List<ConstructorInfo>();
             _ignoreTypeList = ignoreTypeList;

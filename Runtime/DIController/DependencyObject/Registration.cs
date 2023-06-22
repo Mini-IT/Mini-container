@@ -5,7 +5,7 @@ using UnityEngine;
 
 namespace MiniContainer
 {
-    public class Registration
+    public struct Registration : IRegistration
     {
         public RegistrationType RegistrationType { get; internal set; }
 
@@ -82,7 +82,7 @@ namespace MiniContainer
             return this;
         }
 
-        private void AddInterfaceType(Type interfaceType)
+        public void AddInterfaceType(Type interfaceType)
         {
             if (!interfaceType.IsAssignableFrom(ImplementationType))
             {
