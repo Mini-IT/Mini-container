@@ -116,9 +116,10 @@ namespace MiniContainer
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static Registration RegisterLazy<TService>(
             this IDIService diService,
-            IContainer container)
+            IContainer container,
+            ServiceLifeTime serviceLifeTime = ServiceLifeTime.Singleton)
         {
-            diService.Register<TService>();
+            diService.Register<TService>(serviceLifeTime);
             var lazy = new LazyService<TService>(container);
             var registration = new Registration();
             registration.ImplementationType = lazy.GetType();
@@ -134,9 +135,11 @@ namespace MiniContainer
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static Registration RegisterLazy<TService, TImplementation>(
             this IDIService diService,
-            IContainer container) where TImplementation : class, TService
+            IContainer container,
+            ServiceLifeTime serviceLifeTime = ServiceLifeTime.Singleton)
+            where TImplementation : class, TService
         {
-            diService.Register<TService, TImplementation>();
+            diService.Register<TService, TImplementation>(serviceLifeTime);
             var lazy = new LazyService<TService>(container);
             var registration = new Registration();
             registration.ImplementationType = lazy.GetType();
@@ -270,9 +273,10 @@ namespace MiniContainer
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static Registration RegisterLazy<TService>(
             this IBaseDIService diService,
-            IContainer container)
+            IContainer container,
+            ServiceLifeTime serviceLifeTime = ServiceLifeTime.Singleton)
         {
-            diService.Register<TService>();
+            diService.Register<TService>(serviceLifeTime);
             var lazy = new LazyService<TService>(container);
             var registration = new Registration();
             registration.ImplementationType = lazy.GetType();
@@ -288,9 +292,11 @@ namespace MiniContainer
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static Registration RegisterLazy<TService, TImplementation>(
             this IBaseDIService diService,
-            IContainer container) where TImplementation : class, TService
+            IContainer container,
+            ServiceLifeTime serviceLifeTime = ServiceLifeTime.Singleton)
+            where TImplementation : class, TService
         {
-            diService.Register<TService, TImplementation>();
+            diService.Register<TService, TImplementation>(serviceLifeTime);
             var lazy = new LazyService<TService>(container);
             var registration = new Registration();
             registration.ImplementationType = lazy.GetType();
