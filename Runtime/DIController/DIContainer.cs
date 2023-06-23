@@ -113,7 +113,12 @@ namespace MiniContainer
             var dependencyObject = ResolveType(serviceType);
             if (IsComponentDependencyObject(dependencyObject, out var implementation)) return implementation;
 
-            ResolveObject(dependencyObject.Implementation);
+            if (!dependencyObject.IsResolved)
+            {
+                ResolveObject(dependencyObject.Implementation);
+            }
+
+            dependencyObject.IsResolved = true;
             return dependencyObject.Implementation;
         }
 
@@ -259,6 +264,7 @@ namespace MiniContainer
             else
             {
                 dependencyObject.Disposable?.Dispose();
+                dependencyObject.IsResolved = false;
                 dependencyObject.Implementation = null;
             }
 

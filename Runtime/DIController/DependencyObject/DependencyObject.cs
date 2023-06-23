@@ -11,6 +11,8 @@ namespace MiniContainer
 
         public bool OnSceneDestroyRelease { get; }
 
+        public bool IsResolved { get; internal set; }
+
         public List<Type> InterfaceTypes { get; }
 
         private object _implementation;
