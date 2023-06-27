@@ -13,6 +13,7 @@ namespace MiniContainer
         private readonly List<Type> _ignoreTypeList;
 
         private ConcurrentDictionary<Type, DependencyObject> _serviceDictionary;
+
         private ConcurrentDictionary<Type, DependencyObject> ServiceDictionary
         {
             get
@@ -39,11 +40,11 @@ namespace MiniContainer
                                 case RegistrationType.Base:
                                     dependencyObject = new DependencyObject(
                                         interfaceType,
-                                            _registrations[i].ImplementationType,
-                                            _registrations[i].Implementation,
-                                            _registrations[i].LifeTime,
-                                            _registrations[i].InterfaceTypes,
-                                            _registrations[i].OnSceneDestroyRelease);
+                                        _registrations[i].ImplementationType,
+                                        _registrations[i].Implementation,
+                                        _registrations[i].LifeTime,
+                                        _registrations[i].InterfaceTypes,
+                                        _registrations[i].OnSceneDestroyRelease);
 
                                     break;
                                 case RegistrationType.Component:
@@ -111,15 +112,26 @@ namespace MiniContainer
         public object Resolve(Type serviceType)
         {
             var dependencyObject = ResolveType(serviceType);
-            if (IsComponentDependencyObject(dependencyObject, out var implementation)) return implementation;
+            var impl = dependencyObject.LifeTime == ServiceLifeTime.Singleton
+                ? dependencyObject.Implementation
+                : dependencyObject.WeakReferenceMap.Last().Value.Target;
+
+            if (IsComponentDependencyObject(dependencyObject, out var implementation))
+            {
+                return implementation;
+            }
 
             if (!dependencyObject.IsResolved)
             {
-                ResolveObject(dependencyObject.Implementation);
+                ResolveObject(impl);
             }
 
-            dependencyObject.IsResolved = true;
-            return dependencyObject.Implementation;
+            if (dependencyObject.LifeTime == ServiceLifeTime.Singleton)
+            {
+                dependencyObject.IsResolved = true;
+            }
+
+            return impl;
         }
 
         private bool IsComponentDependencyObject(DependencyObject dependencyObject, out Component implementation)
@@ -141,6 +153,7 @@ namespace MiniContainer
                     {
                         go.transform.SetParent(parent);
                     }
+
                     implementation = go.AddComponent(componentDependencyObject.ServiceType);
                     ResolveObject(implementation);
                     go.SetActive(true);
@@ -184,13 +197,17 @@ namespace MiniContainer
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void ResolveProperty(object implementation)
         {
-            var properties = implementation.GetType().GetProperties(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+            var properties = implementation.GetType()
+                .GetProperties(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
 
             foreach (var property in properties)
             {
                 var attr = property.GetCustomAttribute(typeof(ResolveAttribute));
 
-                if (attr == null) continue;
+                if (attr == null)
+                {
+                    continue;
+                }
 
                 var propertyImpl = ResolveType(property.PropertyType).Implementation;
                 property.SetValue(implementation, propertyImpl);
@@ -200,13 +217,17 @@ namespace MiniContainer
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void ResolveField(object implementation)
         {
-            var fields = implementation.GetType().GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+            var fields = implementation.GetType()
+                .GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
 
             foreach (var field in fields)
             {
                 var attr = field.GetCustomAttribute(typeof(ResolveAttribute));
 
-                if (attr == null) continue;
+                if (attr == null)
+                {
+                    continue;
+                }
 
                 var fieldImpl = ResolveType(field.FieldType).Implementation;
                 field.SetValue(implementation, fieldImpl);
@@ -216,15 +237,20 @@ namespace MiniContainer
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void ResolveMethod(object implementation)
         {
-            var methods = implementation.GetType().GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+            var methods = implementation.GetType()
+                .GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
 
             foreach (var method in methods)
             {
                 var attr = method.GetCustomAttribute(typeof(ResolveAttribute));
 
-                if (attr == null) continue;
+                if (attr == null)
+                {
+                    continue;
+                }
 
-                var parameters = method.GetParameters().Select(p => ResolveType(p.ParameterType).Implementation).ToArray();
+                var parameters = method.GetParameters().Select(p => ResolveType(p.ParameterType).Implementation)
+                    .ToArray();
 
                 method.Invoke(implementation, parameters);
             }
@@ -233,7 +259,9 @@ namespace MiniContainer
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public object GetInstance(Type serviceType)
         {
-            return !ServiceDictionary.TryGetValue(serviceType, out var dependencyObject) ? null : dependencyObject.Implementation;
+            return !ServiceDictionary.TryGetValue(serviceType, out var dependencyObject)
+                ? null
+                : dependencyObject.Implementation;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -246,6 +274,7 @@ namespace MiniContainer
                 {
                     throw new Exception($"There is no such a service {serviceType} registered");
                 }
+
                 throw new Exception($"{obj.DeclaringType} tried to find {serviceType} but dependency is not found.");
             }
 
@@ -254,18 +283,9 @@ namespace MiniContainer
                 return dependencyObject;
             }
 
-            if (dependencyObject.LifeTime == ServiceLifeTime.Singleton)
+            if (TryToGetSingletonImpl(dependencyObject))
             {
-                if (TryToGetSingletonImpl(dependencyObject))
-                {
-                    return dependencyObject;
-                }
-            }
-            else
-            {
-                dependencyObject.Disposable?.Dispose();
-                dependencyObject.IsResolved = false;
-                dependencyObject.Implementation = null;
+                return dependencyObject;
             }
 
             var actualType = dependencyObject.ImplementationType;
@@ -287,21 +307,41 @@ namespace MiniContainer
             }
 
             if (_objectGraph.Any(c => c.GetHashCode() == constructorInfo.GetHashCode()))
+            {
                 throw new Exception($"{constructorInfo.DeclaringType} has circular dependency!");
+            }
 
             _objectGraph.Add(constructorInfo);
 
-            var parameters = constructorInfo.GetParameters().Select(p => ResolveType(p.ParameterType).Implementation).ToArray();
+            var parameters = constructorInfo.GetParameters().Select(p => ResolveType(p.ParameterType).Implementation)
+                .ToArray();
 
             var implementation = Activator.CreateInstance(actualType, parameters);
+
+            dependencyObject.WeakReferenceCount++;
+
+            if (dependencyObject.LifeTime == ServiceLifeTime.Singleton)
+            {
+                dependencyObject.Implementation = implementation;
+            }
+            else
+            {
+                dependencyObject.SetWeakReference(implementation);
+            }
+
             CheckInterfaces(implementation, dependencyObject);
-            dependencyObject.Implementation = implementation;
+
             _objectGraph.Clear();
             return dependencyObject;
         }
 
         private bool TryToGetSingletonImpl(DependencyObject dependencyObject)
         {
+            if (dependencyObject.LifeTime != ServiceLifeTime.Singleton)
+            {
+                return false;
+            }
+
             if (dependencyObject.Implementation != null)
             {
                 return true;
@@ -316,6 +356,7 @@ namespace MiniContainer
                     {
                         ServiceDictionary[dependencyObject.InterfaceTypes[j]].Implementation = impl;
                     }
+
                     return true;
                 }
             }
@@ -328,35 +369,48 @@ namespace MiniContainer
         {
             if (implementation is IContainerUpdateListener containerUpdate)
             {
-                dependencyObject.ContainerUpdate = containerUpdate;
+                dependencyObject.GetListeners().ContainerUpdate =
+                    new WeakReference<IContainerUpdateListener>(containerUpdate);
             }
-            if (implementation is IContainerSceneLoadedListener containerSceneLoaded)
-            {
-                dependencyObject.ContainerSceneLoaded = containerSceneLoaded;
-            }
-            if (implementation is IContainerSceneUnloadedListener containerSceneUnloaded)
-            {
-                dependencyObject.ContainerSceneUnloaded = containerSceneUnloaded;
-            }
-            if (implementation is IContainerApplicationFocusListener containerApplicationFocus)
-            {
-                dependencyObject.ContainerApplicationFocus = containerApplicationFocus;
-            }
-            if (implementation is IContainerApplicationPauseListener containerApplicationPause)
-            {
-                dependencyObject.ContainerApplicationPause = containerApplicationPause;
-            }
+
             if (implementation is IDisposable disposable)
             {
-                dependencyObject.Disposable = disposable;
+                dependencyObject.Disposable = new WeakReference<IDisposable>(disposable);
+            }
+
+            switch (implementation)
+            {
+                case IContainerSceneLoadedListener containerSceneLoaded:
+                    dependencyObject.GetListeners().ContainerSceneLoaded =
+                        new WeakReference<IContainerSceneLoadedListener>(containerSceneLoaded);
+                    break;
+                case IContainerSceneUnloadedListener containerSceneUnloaded:
+                    dependencyObject.GetListeners().ContainerSceneUnloaded =
+                        new WeakReference<IContainerSceneUnloadedListener>(containerSceneUnloaded);
+                    break;
+                case IContainerApplicationFocusListener containerApplicationFocus:
+                    dependencyObject.GetListeners().ContainerApplicationFocus =
+                        new WeakReference<IContainerApplicationFocusListener>(containerApplicationFocus);
+                    break;
+                case IContainerApplicationPauseListener containerApplicationPause:
+                    dependencyObject.GetListeners().ContainerApplicationPause =
+                        new WeakReference<IContainerApplicationPauseListener>(containerApplicationPause);
+                    break;
             }
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Release(Type type)
         {
-            if (!ServiceDictionary.TryGetValue(type, out var value)) return;
-            if (value.Implementation == null) return;
+            if (!ServiceDictionary.TryGetValue(type, out var value))
+            {
+                return;
+            }
+            if (value.Implementation == null)
+            {
+                return;
+            }
+
             ReleaseObject(value);
             ServiceDictionary.TryRemove(type, out _);
         }
@@ -366,7 +420,11 @@ namespace MiniContainer
         {
             foreach (var service in ServiceDictionary)
             {
-                if (service.Value.Implementation == null) continue;
+                if (service.Value.Implementation == null)
+                {
+                    continue;
+                }
+
                 var fields = service.Value.Implementation.GetType()
                     .GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
                 foreach (var field in fields)
@@ -378,25 +436,38 @@ namespace MiniContainer
                 }
             }
 
-            dependencyObject.Disposable?.Dispose();
+            if (dependencyObject.Disposable != null &&
+                dependencyObject.Disposable.TryGetTarget(out var disposable))
+            {
+                disposable.Dispose();
+            }
+
             dependencyObject.Implementation = null;
+            dependencyObject.IsResolved = false;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void ReleaseAll()
         {
-
             foreach (var dependencyObject in ServiceDictionary)
             {
-                if (dependencyObject.Value.Implementation == null || dependencyObject.Value.Implementation is MonoBehaviour)
+                if (dependencyObject.Value.Implementation == null
+                    || dependencyObject.Value.Implementation is MonoBehaviour)
+                {
                     continue;
+                }
 
-                dependencyObject.Value.Disposable?.Dispose();
+                if (dependencyObject.Value.Disposable != null &&
+                    dependencyObject.Value.Disposable.TryGetTarget(out var disposable))
+                {
+                    disposable.Dispose();
+                }
+
                 dependencyObject.Value.Implementation = null;
+                dependencyObject.Value.IsResolved = false;
             }
+
             ServiceDictionary.Clear();
-
-
             _objectGraph.Clear();
         }
 
@@ -405,13 +476,16 @@ namespace MiniContainer
         {
             foreach (var dependencyObject in ServiceDictionary)
             {
-                if (dependencyObject.Value.Implementation == null || dependencyObject.Value.Implementation is MonoBehaviour || !dependencyObject.Value.OnSceneDestroyRelease)
+                if (dependencyObject.Value.Implementation == null
+                    || dependencyObject.Value.Implementation is MonoBehaviour
+                    || !dependencyObject.Value.OnSceneDestroyRelease)
+                {
                     continue;
+                }
 
                 ReleaseObject(dependencyObject.Value);
                 ServiceDictionary.TryRemove(dependencyObject.Key, out _);
             }
-
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -419,9 +493,26 @@ namespace MiniContainer
         {
             foreach (var dependencyObject in ServiceDictionary)
             {
-                dependencyObject.Value.ContainerUpdate?.Update();
-            }
+                foreach (var weakReference in dependencyObject.Value.WeakReferenceMap)
+                {
+                    if (weakReference.Value.Target != null)
+                    {
+                        continue;
+                    }
 
+                    dependencyObject.Value.WeakReferenceMap.TryRemove(weakReference.Key, out var _);
+                    dependencyObject.Value.ListenersMap.TryRemove(weakReference.Key, out var _);
+                }
+
+                foreach (var listeners in dependencyObject.Value.ListenersMap)
+                {
+                    if (listeners.Value.ContainerUpdate != null
+                        && listeners.Value.ContainerUpdate.TryGetTarget(out var target))
+                    {
+                        target.Update();
+                    }
+                }
+            }
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -429,9 +520,15 @@ namespace MiniContainer
         {
             foreach (var dependencyObject in ServiceDictionary)
             {
-                dependencyObject.Value.ContainerSceneLoaded?.OnSceneLoaded(scene);
+                foreach (var listeners in dependencyObject.Value.ListenersMap)
+                {
+                    if (listeners.Value.ContainerSceneLoaded != null &&
+                        listeners.Value.ContainerSceneLoaded.TryGetTarget(out var target))
+                    {
+                        target.OnSceneLoaded(scene);
+                    }
+                }
             }
-
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -439,9 +536,15 @@ namespace MiniContainer
         {
             foreach (var dependencyObject in ServiceDictionary)
             {
-                dependencyObject.Value.ContainerSceneUnloaded?.OnSceneUnloaded(scene);
+                foreach (var listeners in dependencyObject.Value.ListenersMap)
+                {
+                    if (listeners.Value.ContainerSceneUnloaded != null &&
+                        listeners.Value.ContainerSceneUnloaded.TryGetTarget(out var target))
+                    {
+                        target.OnSceneUnloaded(scene);
+                    }
+                }
             }
-
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -449,9 +552,15 @@ namespace MiniContainer
         {
             foreach (var dependencyObject in ServiceDictionary)
             {
-                dependencyObject.Value.ContainerApplicationFocus?.OnApplicationFocus(focus);
+                foreach (var listeners in dependencyObject.Value.ListenersMap)
+                {
+                    if (listeners.Value.ContainerApplicationFocus != null &&
+                        listeners.Value.ContainerApplicationFocus.TryGetTarget(out var target))
+                    {
+                        target.OnApplicationFocus(focus);
+                    }
+                }
             }
-
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -459,9 +568,15 @@ namespace MiniContainer
         {
             foreach (var dependencyObject in ServiceDictionary)
             {
-                dependencyObject.Value.ContainerApplicationPause?.OnApplicationPause(pause);
+                foreach (var listeners in dependencyObject.Value.ListenersMap)
+                {
+                    if (listeners.Value.ContainerApplicationPause != null &&
+                        listeners.Value.ContainerApplicationPause.TryGetTarget(out var target))
+                    {
+                        target.OnApplicationPause(pause);
+                    }
+                }
             }
-
         }
     }
 }
