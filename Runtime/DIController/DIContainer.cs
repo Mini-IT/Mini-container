@@ -118,11 +118,7 @@ namespace MiniContainer
                 ResolveObject(dependencyObject.Implementation);
             }
 
-            if (dependencyObject.LifeTime == ServiceLifeTime.Singleton)
-            {
-                dependencyObject.IsResolved = true;
-            }
-
+            dependencyObject.IsResolved = true;
             return dependencyObject.Implementation;
         }
 
@@ -265,12 +261,12 @@ namespace MiniContainer
                     return dependencyObject;
                 }
             }
-            //else
-            //{
-            //    dependencyObject.Disposable?.Dispose();
-            //    dependencyObject.IsResolved = false;
-            //    dependencyObject.Implementation = null;
-            //}
+            else
+            {
+                dependencyObject.Disposable?.Dispose();
+                dependencyObject.IsResolved = false;
+                dependencyObject.Implementation = null;
+            }
 
             var actualType = dependencyObject.ImplementationType;
 
@@ -299,12 +295,7 @@ namespace MiniContainer
 
             var implementation = Activator.CreateInstance(actualType, parameters);
             CheckInterfaces(implementation, dependencyObject);
-
-            if (dependencyObject.LifeTime == ServiceLifeTime.Singleton)
-            {
-                dependencyObject.Implementation = implementation;
-            }
-
+            dependencyObject.Implementation = implementation;
             _objectGraph.Clear();
             return dependencyObject;
         }
@@ -339,25 +330,25 @@ namespace MiniContainer
             {
                 dependencyObject.ContainerUpdate = containerUpdate;
             }
+            if (implementation is IContainerSceneLoadedListener containerSceneLoaded)
+            {
+                dependencyObject.ContainerSceneLoaded = containerSceneLoaded;
+            }
+            if (implementation is IContainerSceneUnloadedListener containerSceneUnloaded)
+            {
+                dependencyObject.ContainerSceneUnloaded = containerSceneUnloaded;
+            }
+            if (implementation is IContainerApplicationFocusListener containerApplicationFocus)
+            {
+                dependencyObject.ContainerApplicationFocus = containerApplicationFocus;
+            }
+            if (implementation is IContainerApplicationPauseListener containerApplicationPause)
+            {
+                dependencyObject.ContainerApplicationPause = containerApplicationPause;
+            }
             if (implementation is IDisposable disposable)
             {
                 dependencyObject.Disposable = disposable;
-            }
-
-            switch (implementation)
-            {
-                case IContainerSceneLoadedListener containerSceneLoaded:
-                    dependencyObject.ContainerSceneLoaded = containerSceneLoaded;
-                    break;
-                case IContainerSceneUnloadedListener containerSceneUnloaded:
-                    dependencyObject.ContainerSceneUnloaded = containerSceneUnloaded;
-                    break;
-                case IContainerApplicationFocusListener containerApplicationFocus:
-                    dependencyObject.ContainerApplicationFocus = containerApplicationFocus;
-                    break;
-                case IContainerApplicationPauseListener containerApplicationPause:
-                    dependencyObject.ContainerApplicationPause = containerApplicationPause;
-                    break;
             }
         }
 
@@ -389,7 +380,6 @@ namespace MiniContainer
 
             dependencyObject.Disposable?.Dispose();
             dependencyObject.Implementation = null;
-            dependencyObject.IsResolved = false;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -398,18 +388,15 @@ namespace MiniContainer
 
             foreach (var dependencyObject in ServiceDictionary)
             {
-                if (dependencyObject.Value.Implementation == null
-                    || dependencyObject.Value.Implementation is MonoBehaviour)
-                {
+                if (dependencyObject.Value.Implementation == null || dependencyObject.Value.Implementation is MonoBehaviour)
                     continue;
-                }
 
                 dependencyObject.Value.Disposable?.Dispose();
                 dependencyObject.Value.Implementation = null;
-                dependencyObject.Value.IsResolved = false;
             }
-
             ServiceDictionary.Clear();
+
+
             _objectGraph.Clear();
         }
 
