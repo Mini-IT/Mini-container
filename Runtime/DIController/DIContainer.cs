@@ -112,12 +112,13 @@ namespace MiniContainer
         public object Resolve(Type serviceType)
         {
             var dependencyObject = ResolveType(serviceType);
-            var impl = dependencyObject.GetOrSetInstance;
 
             if (IsComponentDependencyObject(dependencyObject, out var implementation))
             {
                 return implementation;
             }
+            
+            var impl = dependencyObject.GetOrSetInstance;
 
             if (!dependencyObject.IsResolved)
             {
