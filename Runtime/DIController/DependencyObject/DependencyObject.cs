@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace MiniContainer
 {
@@ -28,9 +29,20 @@ namespace MiniContainer
 
         internal int WeakReferenceCount { get; set; }
 
-        internal void SetWeakReference(object impl)
+        internal object GetOrSetInstance
         {
-            WeakReferenceMap.TryAdd(WeakReferenceCount, new WeakReference(impl));
+            get => LifeTime == ServiceLifeTime.Singleton ? Implementation : WeakReferenceMap.Last().Value.Target;
+            set
+            {
+                if (LifeTime == ServiceLifeTime.Singleton)
+                {
+                    Implementation = value;
+                }
+                else
+                {
+                    WeakReferenceMap.TryAdd(WeakReferenceCount, new WeakReference(value));
+                }
+            }
         }
         
         internal Listeners GetListeners()

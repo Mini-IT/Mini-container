@@ -112,9 +112,7 @@ namespace MiniContainer
         public object Resolve(Type serviceType)
         {
             var dependencyObject = ResolveType(serviceType);
-            var impl = dependencyObject.LifeTime == ServiceLifeTime.Singleton
-                ? dependencyObject.Implementation
-                : dependencyObject.WeakReferenceMap.Last().Value.Target;
+            var impl = dependencyObject.GetOrSetInstance;
 
             if (IsComponentDependencyObject(dependencyObject, out var implementation))
             {
@@ -313,24 +311,15 @@ namespace MiniContainer
 
             _objectGraph.Add(constructorInfo);
 
-            var parameters = constructorInfo.GetParameters().Select(p => ResolveType(p.ParameterType).Implementation)
+            var parameters = constructorInfo.GetParameters().Select(p => ResolveType(p.ParameterType).GetOrSetInstance)
                 .ToArray();
 
             var implementation = Activator.CreateInstance(actualType, parameters);
 
-            dependencyObject.WeakReferenceCount++;
-
-            if (dependencyObject.LifeTime == ServiceLifeTime.Singleton)
-            {
-                dependencyObject.Implementation = implementation;
-            }
-            else
-            {
-                dependencyObject.SetWeakReference(implementation);
-            }
+            dependencyObject.GetOrSetInstance = implementation;
 
             CheckInterfaces(implementation, dependencyObject);
-
+            dependencyObject.WeakReferenceCount++;
             _objectGraph.Clear();
             return dependencyObject;
         }
