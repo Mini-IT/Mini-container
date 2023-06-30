@@ -73,7 +73,7 @@ namespace MiniContainer
                             if (dependencyObject == null) continue;
                             if (!_serviceDictionary.TryAdd(dependencyObject.ServiceType, dependencyObject))
                             {
-                                throw new Exception($"Already exist {dependencyObject.ServiceType}");
+                                Errors.InvalidOperation($"Already exist {dependencyObject.ServiceType}");
                             }
                         }
                     }
@@ -271,10 +271,10 @@ namespace MiniContainer
                 var obj = _objectGraph.LastOrDefault();
                 if (obj == null)
                 {
-                    throw new Exception($"There is no such a service {serviceType} registered");
+                    Errors.InvalidOperation($"There is no such a service {serviceType} registered");
                 }
 
-                throw new Exception($"{obj.DeclaringType} tried to find {serviceType} but dependency is not found.");
+                Errors.InvalidOperation($"{obj.DeclaringType} tried to find {serviceType} but dependency is not found.");
             }
 
             if (dependencyObject is ComponentDependencyObject)
@@ -291,12 +291,12 @@ namespace MiniContainer
 
             if (actualType.IsAbstract || actualType.IsInterface)
             {
-                throw new Exception($"Cannot instantiate abstract classes or interfaces {actualType}");
+                Errors.InvalidOperation($"Cannot instantiate abstract classes or interfaces {actualType}");
             }
 
             if (actualType.GetConstructors().Length == 0)
             {
-                throw new Exception($"{actualType} has no public constructors ");
+                Errors.InvalidOperation($"{actualType} has no public constructors ");
             }
 
             var constructorInfo = actualType.GetConstructors().FirstOrDefault(c => c.GetParameters().Length > 0);
@@ -307,7 +307,7 @@ namespace MiniContainer
 
             if (_objectGraph.Any(c => c.GetHashCode() == constructorInfo.GetHashCode()))
             {
-                throw new Exception($"{constructorInfo.DeclaringType} has circular dependency!");
+                Errors.InvalidOperation($"{constructorInfo.DeclaringType} has circular dependency!");
             }
 
             _objectGraph.Add(constructorInfo);
