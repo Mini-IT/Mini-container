@@ -6,7 +6,7 @@ namespace MiniContainer
     {
         public static void InvalidOperation(string message)
         {
-            Errors.InvalidOperation(message);
+            throw new InvalidOperationException(message);
         }
     }
 }
