@@ -18,7 +18,7 @@ namespace MiniContainer
             AutoResolveAll();
         }
 
-        private void Awake()
+        protected virtual void Awake()
         {
             CompositionRoot.Instance.SubContainerInit(this);
         }
