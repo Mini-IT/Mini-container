@@ -15,7 +15,7 @@ namespace MiniContainer
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static Registration RegisterComponentInNewPrefab<TService>(
             this IDIService diService,
-            TService prefab,
+            TService prefab, 
             Transform parent = null)
             where TService : Component
         {
@@ -67,8 +67,8 @@ namespace MiniContainer
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static Registration Register(
-            this IDIService diService,
-            Type type,
+            this IDIService diService, 
+            Type type, 
             ServiceLifeTime serviceLifeTime = ServiceLifeTime.Singleton)
         {
             var registration = new Registration();
@@ -151,11 +151,28 @@ namespace MiniContainer
 
             return diService.Register(registration);
         }
+        
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static Registration RegisterFactory<TService>(
+            this IDIService diService,
+            IContainer container)
+        {
+            var factory = new FactoryService<TService>(container);
+            var registration = new Registration();
+            registration.ImplementationType = factory.GetType();
+            registration.As<IFactoryService<TService>>();
+            registration.RegistrationType = RegistrationType.Instance;
+            registration.LifeTime = ServiceLifeTime.Singleton;
+            registration.OnSceneDestroyRelease = false;
+            registration.Implementation = factory;
 
+            return diService.Register(registration);
+        }
+        
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static Registration Register<TService, TImplementation>(
-            this IDIService diService,
-            ServiceLifeTime serviceLifeTime = ServiceLifeTime.Singleton)
+            this IDIService diService, 
+            ServiceLifeTime serviceLifeTime = ServiceLifeTime.Singleton) 
             where TImplementation : class, TService
         {
             var registration = new Registration();
@@ -167,7 +184,7 @@ namespace MiniContainer
 
             return diService.Register(registration);
         }
-
+        
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static Registration RegisterComponentInNewPrefab<TService>(
             this IBaseDIService diService,
@@ -203,7 +220,7 @@ namespace MiniContainer
             registration.OnSceneDestroyRelease = true;
             registration.GameObjectName = newGameObjectName;
             registration.Parent = parent;
-
+            
             return diService.Register(registration);
         }
 
@@ -224,7 +241,7 @@ namespace MiniContainer
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static Registration Register(
-            this IBaseDIService diService,
+            this IBaseDIService diService, 
             Type type,
             ServiceLifeTime serviceLifeTime = ServiceLifeTime.Singleton)
         {
@@ -240,7 +257,7 @@ namespace MiniContainer
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static Registration RegisterInstance<TService>(
-            this IBaseDIService diService,
+            this IBaseDIService diService, 
             TService implementation)
         {
             var registration = new Registration();
@@ -293,7 +310,7 @@ namespace MiniContainer
         public static Registration RegisterLazy<TService, TImplementation>(
             this IBaseDIService diService,
             IContainer container,
-            ServiceLifeTime serviceLifeTime = ServiceLifeTime.Singleton)
+            ServiceLifeTime serviceLifeTime = ServiceLifeTime.Singleton) 
             where TImplementation : class, TService
         {
             diService.Register<TService, TImplementation>(serviceLifeTime);
@@ -308,11 +325,28 @@ namespace MiniContainer
 
             return diService.Register(registration);
         }
+        
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static Registration RegisterFactory<TService>(
+            this IBaseDIService diService,
+            IContainer container)
+        {
+            var factory = new FactoryService<TService>(container);
+            var registration = new Registration();
+            registration.ImplementationType = factory.GetType();
+            registration.As<IFactoryService<TService>>();
+            registration.RegistrationType = RegistrationType.Instance;
+            registration.LifeTime = ServiceLifeTime.Singleton;
+            registration.OnSceneDestroyRelease = true;
+            registration.Implementation = factory;
+
+            return diService.Register(registration);
+        }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static Registration Register<TService, TImplementation>(
-            this IBaseDIService diService,
-            ServiceLifeTime serviceLifeTime = ServiceLifeTime.Singleton)
+            this IBaseDIService diService, 
+            ServiceLifeTime serviceLifeTime = ServiceLifeTime.Singleton) 
             where TImplementation : class, TService
         {
             var registration = new Registration();

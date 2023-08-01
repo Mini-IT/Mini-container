@@ -18,7 +18,7 @@ namespace MiniContainer
             AutoResolveAll();
         }
 
-        protected override void DoRegister(IRegistrable registrable)
+        protected sealed override void DoRegister(IRegistrable registrable)
         {
             DIService.RegisterInstanceAsSelf(registrable);
         }
