@@ -42,11 +42,7 @@ namespace MiniContainer
         {
             subContainer.Init(_diService, _container);
         }
-
-        private void Start()
-        {
-        }
-
+        
         private void Update()
         {
             _container?.RunUpdate();

@@ -297,7 +297,7 @@ namespace MiniContainer
                     continue;
                 }
 
-                var parameters = SelectParameters(method.GetParameters());
+                var parameters = SelectParameters(method.GetParameters(), implementation.GetType());
 
                 method.Invoke(implementation, parameters);
             }
@@ -306,18 +306,7 @@ namespace MiniContainer
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private DependencyObject ResolveType(Type serviceType)
         {
-            if (!ServiceDictionary[0].TryGetValue(serviceType, out var dependencyObject))
-            {
-                ConstructorInfo obj = null;
-                if (_objectGraph.Count > 0)
-                {
-                    obj = _objectGraph[^1];
-                }
-
-                ContainerDebug.InvalidOperation(obj == null
-                    ? $"There is no such a service {serviceType} registered"
-                    : $"{obj.DeclaringType} tried to find {serviceType} but dependency is not found.");
-            }
+            var dependencyObject = TryGetDependencyObject(serviceType);
 
             if (dependencyObject != null)
             {
@@ -353,7 +342,7 @@ namespace MiniContainer
 
                 _objectGraph.Add(_constructorInfo);
 
-                var parameters = SelectParameters(_constructorInfo.GetParameters());
+                var parameters = SelectParameters(_constructorInfo.GetParameters(), dependencyObject.ImplementationType);
 
                 var objectActivator = Activator.GetActivator<object>(_constructorInfo);
 
@@ -369,6 +358,24 @@ namespace MiniContainer
             }
 
             _objectGraph.Clear();
+            return dependencyObject;
+        }
+
+        private DependencyObject TryGetDependencyObject(Type serviceType)
+        {
+            if (!ServiceDictionary[0].TryGetValue(serviceType, out var dependencyObject))
+            {
+                ConstructorInfo obj = null;
+                if (_objectGraph.Count > 0)
+                {
+                    obj = _objectGraph[^1];
+                }
+
+                ContainerDebug.InvalidOperation(obj == null
+                    ? $"There is no such a service {serviceType} registered"
+                    : $"{obj.DeclaringType} tried to find {serviceType} but dependency is not found.");
+            }
+
             return dependencyObject;
         }
 
@@ -408,16 +415,30 @@ namespace MiniContainer
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private object[] SelectParameters(ParameterInfo[] parameters)
+        private object[] SelectParameters(ParameterInfo[] parameters, Type origin)
         {
+            var dependencyObject = TryGetDependencyObject(origin);
             var instances = new object[parameters.Length];
             for (var i = 0; i < parameters.Length; i++)
             {
                 var p = parameters[i];
+                CheckCaptiveDependency(origin, dependencyObject, p);
                 instances[i] = ResolveType(p.ParameterType).Implementation;
             }
 
             return instances;
+        }
+
+        private void CheckCaptiveDependency(Type origin, DependencyObject dependencyObject, ParameterInfo p)
+        {
+            if (dependencyObject.LifeTime == ServiceLifeTime.Singleton)
+            {
+                var scopedDependencyObject = TryGetDependencyObject(p.ParameterType);
+                if (scopedDependencyObject.LifeTime == ServiceLifeTime.Scoped)
+                {
+                    ContainerDebug.InvalidOperation($"Captive dependency found: {p.ParameterType} in {origin}");
+                }
+            }
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
