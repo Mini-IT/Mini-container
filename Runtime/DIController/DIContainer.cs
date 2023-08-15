@@ -360,6 +360,7 @@ namespace MiniContainer
                 dependencyObject.Implementation = objectActivator(parameters);
 
                 ResolveObject(dependencyObject.Implementation);
+                
                 if (dependencyObject.LifeTime != ServiceLifeTime.Transient)
                 {
                     CheckInterfaces(dependencyObject);
@@ -528,7 +529,10 @@ namespace MiniContainer
                 ContainerDebug.Log($"<color=green> Scope has been released with ID {scopeID}</color>");
             }
 
-            _currentScopeID = 0;
+            if (scopeID == _currentScopeID)
+            {
+                _currentScopeID = 0;
+            }
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

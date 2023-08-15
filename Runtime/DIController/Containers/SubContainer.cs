@@ -5,7 +5,7 @@ namespace MiniContainer
     [DefaultExecutionOrder(-6000)]
     public class SubContainer : Container
     {
-        protected IBaseDIService DIService;
+        protected IBaseDIService DIService { get; private set; }
 
         public void Init(IBaseDIService diService, IContainer container)
         {
