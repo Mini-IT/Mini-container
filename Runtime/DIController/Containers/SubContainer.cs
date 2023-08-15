@@ -13,7 +13,7 @@ namespace MiniContainer
             DIContainer = container;
             AutoRegisterAll();
             Register();
-            container.ResolveInstanceRegistered(true);
+            container.ResolveInstanceRegistered();
             Resolve();
             AutoResolveAll();
         }

@@ -36,7 +36,6 @@ namespace MiniContainer
 
             DontDestroyOnLoad(gameObject);
             InitSystem();
-
         }
 
         public void SubContainerInit(SubContainer subContainer)
@@ -89,7 +88,6 @@ namespace MiniContainer
         private void OnSceneUnloaded(Scene scene)
         {
             _container?.RunSceneUnloaded(scene.buildIndex);
-            _container?.ReleaseScene();
         }
 
         private void OnDestroy()

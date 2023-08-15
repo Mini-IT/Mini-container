@@ -14,7 +14,6 @@ namespace MiniContainer
         object Implementation { get; }
         List<Type> InterfaceTypes { get; }
         ServiceLifeTime LifeTime { get; }
-        bool OnSceneDestroyRelease { get; }
         Registration As<TInterface>();
         Registration As<TInterface1, TInterface2>();
         Registration As<TInterface1, TInterface2, TInterface3>();

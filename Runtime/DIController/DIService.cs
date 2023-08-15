@@ -6,23 +6,17 @@ namespace MiniContainer
 {
     public class DIService : IDIService
     {
-        private readonly List<IRegistration> _registrations;
-        private readonly List<Type> _ignoreTypeList;
-
-        public DIService()
+        private readonly List<IRegistration> _registrations = new List<IRegistration>();
+        private readonly List<Type> _ignoreTypeList = new List<Type>()
         {
-            _ignoreTypeList = new List<Type>()
-            {
-                typeof(IContainerUpdateListener),
-                typeof(IContainerSceneLoadedListener),
-                typeof(IContainerSceneUnloadedListener),
-                typeof(IContainerApplicationFocusListener),
-                typeof(IContainerApplicationPauseListener),
-                typeof(IDisposable)
-            };
-            _registrations = new List<IRegistration>();
-        }
-
+            typeof(IContainerUpdateListener),
+            typeof(IContainerSceneLoadedListener),
+            typeof(IContainerSceneUnloadedListener),
+            typeof(IContainerApplicationFocusListener),
+            typeof(IContainerApplicationPauseListener),
+            typeof(IDisposable)
+        };
+        
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public T Register<T>(T registration) where T : IRegistration
         {
@@ -38,7 +32,9 @@ namespace MiniContainer
 
         public DIContainer GenerateContainer()
         {
-            return new DIContainer(_registrations, _ignoreTypeList);
+            var container = new DIContainer(_registrations, _ignoreTypeList);
+            this.RegisterInstance(new ScopeManager(container)).AsImplementedInterfaces();
+            return container;
         }
     }
 }

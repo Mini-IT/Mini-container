@@ -10,8 +10,15 @@ namespace MiniContainer
         public Transform Parent { get; }
         public string GameObjectName { get; }
 
-        public ComponentDependencyObject(Type serviceType, Type implementationType, object implementation, ServiceLifeTime lifeTime, List<Type> interfaceTypes, bool onSceneDestroyRelease, Component prefab, Transform parent, string gameObjectName) 
-            : base(serviceType, implementationType, implementation, lifeTime, interfaceTypes, onSceneDestroyRelease)
+        public ComponentDependencyObject(Type serviceType,
+            Type implementationType,
+            object implementation,
+            ServiceLifeTime lifeTime,
+            List<Type> interfaceTypes,
+            Component prefab,
+            Transform parent,
+            string gameObjectName) 
+            : base(serviceType, implementationType, implementation, lifeTime, interfaceTypes)
         {
             Prefab = prefab;
             Parent = parent;
