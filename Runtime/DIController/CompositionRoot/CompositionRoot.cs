@@ -57,7 +57,7 @@ namespace MiniContainer
             {
                 if (rootContainer == null)
                 {
-                    throw new NullReferenceException("Root container should not be null! Check CompositionRoot in the inspector!");
+                    ContainerDebug.InvalidOperation("Root container should not be null! Check CompositionRoot in the inspector!");
                 }
                 rootContainer.Init(_diService, _container);
             }
@@ -85,7 +85,7 @@ namespace MiniContainer
         {
             _container?.RunSceneUnloaded(scene.buildIndex);
         }
-
+        
         private void OnDestroy()
         {
             if (_objects.Length == 1)

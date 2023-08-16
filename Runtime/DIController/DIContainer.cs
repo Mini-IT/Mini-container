@@ -218,9 +218,9 @@ namespace MiniContainer
                         ? UnityEngine.Object.Instantiate(componentDependencyObject.Prefab)
                         : UnityEngine.Object.Instantiate(componentDependencyObject.Prefab,
                             componentDependencyObject.Parent);
-
+                    
                     ResolveObject(implementation);
-
+                    
                     if (wasActive)
                     {
                         implementation.gameObject.SetActive(true);
@@ -297,8 +297,7 @@ namespace MiniContainer
                     continue;
                 }
 
-                var parameters = SelectParameters(method.GetParameters(), implementation.GetType());
-
+                var parameters = SelectParameters(method.GetParameters());
                 method.Invoke(implementation, parameters);
             }
         }
@@ -341,13 +340,11 @@ namespace MiniContainer
                 CheckCircularDependency();
 
                 _objectGraph.Add(_constructorInfo);
-
-                var parameters = SelectParameters(_constructorInfo.GetParameters(), dependencyObject.ImplementationType);
-
+                
                 var objectActivator = Activator.GetActivator<object>(_constructorInfo);
-
+                var parameters = SelectParameters(_constructorInfo.GetParameters());
                 dependencyObject.Implementation = objectActivator(parameters);
-
+                
                 ResolveObject(dependencyObject.Implementation);
                 
                 if (dependencyObject.LifeTime != ServiceLifeTime.Transient)
@@ -415,30 +412,16 @@ namespace MiniContainer
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private object[] SelectParameters(ParameterInfo[] parameters, Type origin)
+        private object[] SelectParameters(ParameterInfo[] parameters)
         {
-            var dependencyObject = TryGetDependencyObject(origin);
             var instances = new object[parameters.Length];
             for (var i = 0; i < parameters.Length; i++)
             {
                 var p = parameters[i];
-                CheckCaptiveDependency(origin, dependencyObject, p);
                 instances[i] = ResolveType(p.ParameterType).Implementation;
             }
 
             return instances;
-        }
-
-        private void CheckCaptiveDependency(Type origin, DependencyObject dependencyObject, ParameterInfo p)
-        {
-            if (dependencyObject.LifeTime == ServiceLifeTime.Singleton)
-            {
-                var scopedDependencyObject = TryGetDependencyObject(p.ParameterType);
-                if (scopedDependencyObject.LifeTime == ServiceLifeTime.Scoped)
-                {
-                    ContainerDebug.InvalidOperation($"Captive dependency found: {p.ParameterType} in {origin}");
-                }
-            }
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
