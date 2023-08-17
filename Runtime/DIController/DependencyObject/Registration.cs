@@ -84,7 +84,7 @@ namespace MiniContainer
         {
             if (!interfaceType.IsAssignableFrom(ImplementationType))
             {
-                ContainerDebug.InvalidOperation($"{ImplementationType} is not assignable from {interfaceType}");
+                Errors.InvalidOperation($"{ImplementationType} is not assignable from {interfaceType}");
             }
 
             InterfaceTypes ??= new List<Type>();

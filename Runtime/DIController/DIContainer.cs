@@ -47,7 +47,7 @@ namespace MiniContainer
             }
             else
             {
-                ContainerDebug.InvalidOperation($"Scope with ID:{scopeID} doesn't exist");
+                Errors.InvalidOperation($"Scope with ID:{scopeID} doesn't exist");
             }
         }
 
@@ -56,7 +56,7 @@ namespace MiniContainer
         {
             _currentScopeID++;
             _serviceDictionary[_currentScopeID] = new ConcurrentDictionary<Type, DependencyObject>();
-            ContainerDebug.Log($"<color=green> New scope has been created with ID: {_currentScopeID}</color>");
+            Errors.Log($"<color=green> New scope has been created with ID: {_currentScopeID}</color>");
             return _currentScopeID;
         }
 
@@ -81,7 +81,7 @@ namespace MiniContainer
                         if (dependencyObject == null) continue;
                         if (!_serviceDictionary[0].TryAdd(dependencyObject.ServiceType, dependencyObject))
                         {
-                            ContainerDebug.InvalidOperation($"Already exist {dependencyObject.ServiceType}");
+                            Errors.InvalidOperation($"Already exist {dependencyObject.ServiceType}");
                         }
                     }
                 }
@@ -323,12 +323,12 @@ namespace MiniContainer
 
                 if (actualType.IsAbstract || actualType.IsInterface)
                 {
-                    ContainerDebug.InvalidOperation($"Cannot instantiate abstract classes or interfaces {actualType}");
+                    Errors.InvalidOperation($"Cannot instantiate abstract classes or interfaces {actualType}");
                 }
 
                 if (actualType.GetConstructors().Length == 0)
                 {
-                    ContainerDebug.InvalidOperation($"{actualType} has no public constructors ");
+                    Errors.InvalidOperation($"{actualType} has no public constructors ");
                 }
 
                 _constructorInfo = GetConstructorInfo(actualType);
@@ -368,7 +368,7 @@ namespace MiniContainer
                     obj = _objectGraph[^1];
                 }
 
-                ContainerDebug.InvalidOperation(obj == null
+                Errors.InvalidOperation(obj == null
                     ? $"There is no such a service {serviceType} registered"
                     : $"{obj.DeclaringType} tried to find {serviceType} but dependency is not found.");
             }
@@ -431,7 +431,7 @@ namespace MiniContainer
             {
                 var c = _objectGraph[i];
                 if (c.GetHashCode() != _constructorInfo.GetHashCode()) continue;
-                ContainerDebug.InvalidOperation($"{_constructorInfo.DeclaringType} has circular dependency!");
+                Errors.InvalidOperation($"{_constructorInfo.DeclaringType} has circular dependency!");
                 break;
             }
         }
@@ -518,7 +518,7 @@ namespace MiniContainer
         {
             if (scopeID <= 0)
             {
-                ContainerDebug.Log("<color=yellow>You can't release the main scope</color>");
+                Errors.Log("<color=yellow>You can't release the main scope</color>");
                 return;
             }
 
@@ -530,7 +530,7 @@ namespace MiniContainer
                 }
 
                 scope.Clear();
-                ContainerDebug.Log($"<color=green> Scope has been released with ID {scopeID}</color>");
+                Errors.Log($"<color=green> Scope has been released with ID {scopeID}</color>");
             }
 
             if (scopeID == _currentScopeID)

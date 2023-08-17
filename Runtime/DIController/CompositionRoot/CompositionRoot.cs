@@ -57,7 +57,7 @@ namespace MiniContainer
             {
                 if (rootContainer == null)
                 {
-                    ContainerDebug.InvalidOperation("Root container should not be null! Check CompositionRoot in the inspector!");
+                    Errors.InvalidOperation("Root container should not be null! Check CompositionRoot in the inspector!");
                 }
                 rootContainer.Init(_diService, _container);
             }

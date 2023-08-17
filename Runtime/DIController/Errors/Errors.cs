@@ -3,7 +3,7 @@ using UnityEngine;
 
 namespace MiniContainer
 {
-    internal static class ContainerDebug
+    internal static class Errors
     {
         public static void InvalidOperation(string message)
         {
