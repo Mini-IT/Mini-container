@@ -1,4 +1,5 @@
-﻿using System.Linq.Expressions;
+﻿using System;
+using System.Linq.Expressions;
 using System.Reflection;
 
 namespace MiniContainer
@@ -39,6 +40,17 @@ namespace MiniContainer
             //compile it
             var compiled = (ObjectActivator<T>)lambda.Compile();
             return compiled;
+        }
+        
+        public static Func<object> CreateDefaultConstructor(Type type)
+        {
+            var newExp = Expression.New(type);
+
+            // Create a new lambda expression with the NewExpression as the body.
+            var lambda = Expression.Lambda<Func<object>>(newExp);
+
+            // Compile our new lambda expression.
+            return lambda.Compile();
         }
     }
 }

@@ -97,7 +97,10 @@ namespace MiniContainer
             for (var index = 0; index < _ignoreTypeList.Count; index++)
             {
                 var t = _ignoreTypeList[index];
-                if (t != interfaceType) continue;
+                if (t != interfaceType)
+                {
+                    continue;
+                }
                 any = true;
                 break;
             }
@@ -325,25 +328,23 @@ namespace MiniContainer
                 {
                     Errors.InvalidOperation($"Cannot instantiate abstract classes or interfaces {actualType}");
                 }
-
-                if (actualType.GetConstructors().Length == 0)
-                {
-                    Errors.InvalidOperation($"{actualType} has no public constructors ");
-                }
-
-                _constructorInfo = GetConstructorInfo(actualType);
-                if (_constructorInfo == null)
-                {
-                    _constructorInfo = actualType.GetConstructors()[0];
-                }
-
-                CheckCircularDependency();
-
-                _objectGraph.Add(_constructorInfo);
                 
-                var objectActivator = Activator.GetActivator<object>(_constructorInfo);
-                var parameters = SelectParameters(_constructorInfo.GetParameters());
-                dependencyObject.Implementation = objectActivator(parameters);
+                _constructorInfo = GetConstructorInfo(actualType);
+                
+                if (_constructorInfo != null)
+                {
+                    CheckCircularDependency();
+                
+                    _objectGraph.Add(_constructorInfo);
+                
+                    var objectActivator = Activator.GetActivator<object>(_constructorInfo);
+                    var parameters = SelectParameters(_constructorInfo.GetParameters());
+                    dependencyObject.Implementation = objectActivator.Invoke(parameters);
+                }
+                else
+                {
+                    dependencyObject.Implementation = Activator.CreateDefaultConstructor(actualType).Invoke();
+                }
                 
                 ResolveObject(dependencyObject.Implementation);
                 
@@ -354,6 +355,7 @@ namespace MiniContainer
                 }
             }
 
+            _constructorInfo = null;
             _objectGraph.Clear();
             return dependencyObject;
         }
@@ -430,7 +432,10 @@ namespace MiniContainer
             for (var i = 0; i < _objectGraph.Count; i++)
             {
                 var c = _objectGraph[i];
-                if (c.GetHashCode() != _constructorInfo.GetHashCode()) continue;
+                if (c.GetHashCode() != _constructorInfo.GetHashCode())
+                {
+                    continue;
+                }
                 Errors.InvalidOperation($"{_constructorInfo.DeclaringType} has circular dependency!");
                 break;
             }
@@ -439,11 +444,22 @@ namespace MiniContainer
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private ConstructorInfo GetConstructorInfo(Type actualType)
         {
-            ConstructorInfo first = null;
-            for (var i = 0; i < actualType.GetConstructors().Length; i++)
+            var ctors = actualType.GetConstructors();
+            if (ctors.Length == 0)
             {
-                var c = actualType.GetConstructors()[i];
-                if (c.GetParameters().Length <= 0) continue;
+                Errors.Log($"<color=yellow>{actualType} has no public constructors</color>");
+                return null;
+            }
+            
+            var first = ctors[0];
+            
+            for (var i = 0; i < ctors.Length; i++)
+            {
+                var c = ctors[i];
+                if (c.GetParameters().Length <= 0)
+                {
+                    continue;
+                }
                 first = c;
                 break;
             }
