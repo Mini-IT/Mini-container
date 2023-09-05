@@ -500,33 +500,8 @@ namespace MiniContainer
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static void CheckInterfaces(DependencyObject dependencyObject)
         {
-            var dependencyObjectListeners = dependencyObject.Listeners;
-            var implementation = dependencyObject.Implementation;
-            if (implementation is IContainerUpdateListener containerUpdate)
-            {
-                dependencyObjectListeners.ContainerUpdate = containerUpdate;
-            }
-
-            if (implementation is IDisposable disposable)
-            {
-                dependencyObject.Disposable = disposable;
-            }
-
-            switch (implementation)
-            {
-                case IContainerSceneLoadedListener containerSceneLoaded:
-                    dependencyObjectListeners.ContainerSceneLoaded = containerSceneLoaded;
-                    break;
-                case IContainerSceneUnloadedListener containerSceneUnloaded:
-                    dependencyObjectListeners.ContainerSceneUnloaded = containerSceneUnloaded;
-                    break;
-                case IContainerApplicationFocusListener containerApplicationFocus:
-                    dependencyObjectListeners.ContainerApplicationFocus = containerApplicationFocus;
-                    break;
-                case IContainerApplicationPauseListener containerApplicationPause:
-                    dependencyObjectListeners.ContainerApplicationPause = containerApplicationPause;
-                    break;
-            }
+            dependencyObject.TryToSetDisposable();
+            dependencyObject.TryToSetListeners();
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

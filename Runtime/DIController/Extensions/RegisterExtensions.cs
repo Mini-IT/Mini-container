@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Runtime.CompilerServices;
 using UnityEngine;
+using Object = UnityEngine.Object;
 
 namespace MiniContainer
 {
@@ -80,8 +81,8 @@ namespace MiniContainer
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static Registration RegisterInstance<TService>(
-            this IBaseDIService diService, 
-            TService implementation)
+            this IBaseDIService diService,
+            TService implementation) where TService : class
         {
             var registration = new Registration();
             registration.ImplementationType = typeof(TService);

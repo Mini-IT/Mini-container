@@ -12,13 +12,13 @@ namespace MiniContainer
         internal List<Type> InterfaceTypes { get; }
 
         internal object Implementation { get; set; }
-
-        internal IDisposable Disposable { get; set; }
-
+        
         internal ServiceLifeTime LifeTime { get; }
-
+        
         internal Listeners Listeners { get; }
         
+        private IDisposable _disposable;
+
         internal DependencyObject(Type serviceType, Type implementationType, object implementation,
             ServiceLifeTime lifeTime, List<Type> interfaceTypes)
         {
@@ -40,10 +40,46 @@ namespace MiniContainer
             InterfaceTypes = dependencyObject.InterfaceTypes;
         }
 
+        public void TryToSetDisposable()
+        {
+            if (Implementation is IDisposable disposable)
+            {
+                _disposable = disposable;
+            }
+        }
+
+        public void TryToSetListeners()
+        {
+            if (Implementation is IContainerSceneLoadedListener containerSceneLoaded)
+            {
+                Listeners.ContainerSceneLoaded = containerSceneLoaded;
+            }
+            
+            if (Implementation is IContainerUpdateListener containerUpdate)
+            {
+                Listeners.ContainerUpdate = containerUpdate;
+            }
+            
+            if (Implementation is IContainerSceneUnloadedListener containerSceneUnloaded)
+            {
+                Listeners.ContainerSceneUnloaded = containerSceneUnloaded;
+            }
+
+            if (Implementation is IContainerApplicationFocusListener containerApplicationFocus)
+            {
+                Listeners.ContainerApplicationFocus = containerApplicationFocus;
+            }
+
+            if (Implementation is IContainerApplicationPauseListener containerApplicationPause)
+            {
+                Listeners.ContainerApplicationPause = containerApplicationPause;
+            }
+        }
+
         public void Dispose()
         {
             Implementation = null;
-            Disposable?.Dispose();
+            _disposable?.Dispose();
             Listeners.Dispose();
         }
     }
