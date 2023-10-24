@@ -353,11 +353,21 @@ namespace MiniContainer
                     CheckInterfaces(dependencyObject);
                     TryToSetImplementationTypes(dependencyObject);
                 }
+                
+                TryToInitialize(dependencyObject);
             }
-
+            
             _constructorInfo = null;
             _objectGraph.Clear();
             return dependencyObject;
+        }
+
+        private static void TryToInitialize(DependencyObject dependencyObject)
+        {
+            if (dependencyObject.Implementation is IContainerInitializable initializable)
+            {
+                initializable.Initialize();
+            }
         }
 
         private DependencyObject TryGetDependencyObject(Type serviceType)
