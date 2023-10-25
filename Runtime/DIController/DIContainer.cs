@@ -563,7 +563,7 @@ namespace MiniContainer
                     if (listeners.Value.ContainerApplicationPause != null &&
                         listeners.Value.ContainerApplicationPause.TryGetTarget(out var target))
                     {
-                        target.OnApplicationPause(pause);
+                        target.OnApplicationPause(pause); 
                     }
                 }
             }
