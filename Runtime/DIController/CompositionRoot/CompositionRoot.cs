@@ -57,7 +57,12 @@ namespace MiniContainer
             }
             for (var i = 0; i < _rootContainers.Count; i++)
             {
-                _rootContainers[i].Init(_diService, _container);
+                var rootContainer = _rootContainers[i];
+                if (rootContainer == null)
+                {
+                    Errors.InvalidOperation("Root container should not be null! Check CompositionRoot in the inspector!");
+                }
+                rootContainer.Init(_diService, _container);
             }
             for (var i = 0; i < _rootContainers.Count; i++)
             {
