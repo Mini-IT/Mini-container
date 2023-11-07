@@ -13,7 +13,7 @@ namespace MiniContainer
         
         protected IContainer DIContainer { get; set; }
 
-        protected virtual void Register() { }
+        protected virtual void Register(IBaseDIService builder) { }
 
         protected virtual void Resolve() { }
 

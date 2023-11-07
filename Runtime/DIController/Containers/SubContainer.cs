@@ -5,14 +5,14 @@ namespace MiniContainer
     [DefaultExecutionOrder(-6000)]
     public class SubContainer : Container
     {
-        protected IBaseDIService DIService { get; private set; }
+        private IBaseDIService _diService;
 
         public void Init(IBaseDIService diService, IContainer container)
         {
-            DIService = diService;
+            _diService = diService;
             DIContainer = container;
             AutoRegisterAll();
-            Register();
+            Register(diService);
             container.ResolveInstanceRegistered();
             Resolve();
             AutoResolveAll();
@@ -25,7 +25,7 @@ namespace MiniContainer
 
         protected override void DoRegister(IRegistrable registrable)
         {
-            DIService.RegisterInstanceAsSelf(registrable);
+            _diService.RegisterInstanceAsSelf(registrable);
         }
     }
 }
