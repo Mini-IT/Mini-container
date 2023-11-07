@@ -13,11 +13,11 @@ namespace MiniContainer
         
         protected IContainer DIContainer { get; set; }
 
-        protected virtual void Register() { }
+        protected virtual void Register(IBaseDIService builder) { }
 
         protected virtual void Resolve() { }
 
-        protected void AutoRegisterAll()
+        protected void AutoRegisterAll(IBaseDIService builder)
         {
             if (_autoRegisterGameObjects == null)
                 return;
@@ -26,12 +26,12 @@ namespace MiniContainer
             {
                 if (target != null) // Check missing reference
                 {
-                    RegisterGameObject(target);
+                    RegisterGameObject(builder, target);
                 }
             }
         }
 
-        private void RegisterGameObject(GameObject go)
+        private void RegisterGameObject(IBaseDIService builder, GameObject go)
         {
             var buffer = ObjectListBuffer<MonoBehaviour>.Get();
 
@@ -43,7 +43,7 @@ namespace MiniContainer
             {
                 if (monoBehaviour is IRegistrable registrable)
                 {
-                    DoRegister(registrable);
+                    DoRegister(builder,registrable);
                 }
                 //else
                 //{
@@ -52,8 +52,11 @@ namespace MiniContainer
             }
         }
 
-        protected abstract void DoRegister(IRegistrable registrable);
-        
+        private void DoRegister(IBaseDIService builder, IRegistrable registrable)
+        {
+            builder.RegisterInstanceAsSelf(registrable);
+        }
+
         protected void AutoResolveAll()
         {
             if (_autoResolveGameObjects == null)
