@@ -52,7 +52,7 @@ namespace MiniContainer
             }
         }
 
-        protected void DoRegister(IBaseDIService builder, IRegistrable registrable)
+        private void DoRegister(IBaseDIService builder, IRegistrable registrable)
         {
             builder.RegisterInstanceAsSelf(registrable);
         }
