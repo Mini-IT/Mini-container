@@ -8,6 +8,7 @@ namespace MiniContainer
         void ResolveObject(object implementation);
         void ResolveInstanceRegistered();
         void ReleaseAll();
+        void Release(Type type);
         void RunUpdate();
         void RunSceneLoaded(int scene);
         void RunSceneUnloaded(int scene);
