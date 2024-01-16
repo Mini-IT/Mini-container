@@ -10,6 +10,8 @@ namespace MiniContainer
 
         [SerializeField]
         private List<GameObject> _autoResolveGameObjects;
+
+        private List<IRegistrable> _autoRegistrables;
         
         protected IContainer DIContainer { get; set; }
 
@@ -20,11 +22,15 @@ namespace MiniContainer
         protected void AutoRegisterAll(IBaseDIService builder)
         {
             if (_autoRegisterGameObjects == null)
+            {
                 return;
+            }
+            
+            _autoRegistrables = new List<IRegistrable>(_autoRegisterGameObjects.Count);
 
             foreach (var target in _autoRegisterGameObjects)
             {
-                if (target != null) // Check missing reference
+                if (target != null)
                 {
                     RegisterGameObject(builder, target);
                 }
@@ -35,7 +41,10 @@ namespace MiniContainer
         {
             var buffer = ObjectListBuffer<MonoBehaviour>.Get();
 
-            if (go == null) return;
+            if (go == null)
+            {
+                return;
+            }
 
             buffer.Clear();
             go.GetComponents(buffer);
@@ -45,26 +54,25 @@ namespace MiniContainer
                 {
                     DoRegister(builder,registrable);
                 }
-                //else
-                //{
-                //    Debug.LogError($"AutoRegisterGameObject cannot be registered because {monoBehaviour.GetType()} doesn't implement IRegistrable");
-                //}
             }
         }
 
         private void DoRegister(IBaseDIService builder, IRegistrable registrable)
         {
+            _autoRegistrables.Add(registrable);
             builder.RegisterInstanceAsSelf(registrable);
         }
 
         protected void AutoResolveAll()
         {
             if (_autoResolveGameObjects == null)
+            {
                 return;
+            }
 
             foreach (var target in _autoResolveGameObjects)
             {
-                if (target != null) // Check missing reference
+                if (target != null)
                 {
                     ResolveGameObject(target);
                 }
@@ -75,7 +83,10 @@ namespace MiniContainer
         {
             var buffer = ObjectListBuffer<MonoBehaviour>.Get();
 
-            if (go == null) return;
+            if (go == null)
+            {
+                return;
+            }
 
             buffer.Clear();
             go.GetComponents(buffer);
@@ -85,5 +96,17 @@ namespace MiniContainer
             }
         }
 
+        protected void OnDestroy()
+        {
+            if (_autoRegistrables == null)
+            {
+                return;
+            }
+            
+            foreach (var autoRegistrable in _autoRegistrables)
+            {
+                DIContainer.Release(autoRegistrable.GetType());
+            }
+        }
     }
 }

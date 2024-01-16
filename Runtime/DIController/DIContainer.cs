@@ -560,6 +560,46 @@ namespace MiniContainer
             ServiceDictionary.Clear();
             _objectGraph.Clear();
         }
+        
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void Release(Type type)
+        {
+            if (!ServiceDictionary[0].TryGetValue(type, out var value))
+            {
+                return;
+            }
+            if (value.Implementation == null)
+            {
+                return;
+            }
+
+            ReleaseObject(value);
+            ServiceDictionary[0].TryRemove(type, out _);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private void ReleaseObject(DependencyObject dependencyObject)
+        {
+            foreach (var service in ServiceDictionary[0])
+            {
+                if (service.Value.Implementation == null)
+                {
+                    continue;
+                }
+
+                var fields = service.Value.Implementation.GetType()
+                    .GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+                foreach (var field in fields)
+                {
+                    if (field.FieldType == dependencyObject.ServiceType)
+                    {
+                        field.SetValue(service.Value.Implementation, null);
+                    }
+                }
+            }
+
+            dependencyObject.Dispose();
+        }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void RunUpdate()
