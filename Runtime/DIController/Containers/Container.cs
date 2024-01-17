@@ -10,32 +10,41 @@ namespace MiniContainer
 
         [SerializeField]
         private List<GameObject> _autoResolveGameObjects;
+
+        private List<IRegistrable> _autoRegistrables;
         
         protected IContainer DIContainer { get; set; }
 
-        protected virtual void Register() { }
+        protected virtual void Register(IBaseDIService builder) { }
 
         protected virtual void Resolve() { }
 
-        protected void AutoRegisterAll()
+        protected void AutoRegisterAll(IBaseDIService builder)
         {
             if (_autoRegisterGameObjects == null)
+            {
                 return;
+            }
+            
+            _autoRegistrables = new List<IRegistrable>(_autoRegisterGameObjects.Count);
 
             foreach (var target in _autoRegisterGameObjects)
             {
-                if (target != null) // Check missing reference
+                if (target != null)
                 {
-                    RegisterGameObject(target);
+                    RegisterGameObject(builder, target);
                 }
             }
         }
 
-        private void RegisterGameObject(GameObject go)
+        private void RegisterGameObject(IBaseDIService builder, GameObject go)
         {
             var buffer = ObjectListBuffer<MonoBehaviour>.Get();
 
-            if (go == null) return;
+            if (go == null)
+            {
+                return;
+            }
 
             buffer.Clear();
             go.GetComponents(buffer);
@@ -43,25 +52,27 @@ namespace MiniContainer
             {
                 if (monoBehaviour is IRegistrable registrable)
                 {
-                    DoRegister(registrable);
+                    DoRegister(builder,registrable);
                 }
-                //else
-                //{
-                //    Debug.LogError($"AutoRegisterGameObject cannot be registered because {monoBehaviour.GetType()} doesn't implement IRegistrable");
-                //}
             }
         }
 
-        protected abstract void DoRegister(IRegistrable registrable);
-        
+        private void DoRegister(IBaseDIService builder, IRegistrable registrable)
+        {
+            _autoRegistrables.Add(registrable);
+            builder.RegisterInstanceAsSelf(registrable);
+        }
+
         protected void AutoResolveAll()
         {
             if (_autoResolveGameObjects == null)
+            {
                 return;
+            }
 
             foreach (var target in _autoResolveGameObjects)
             {
-                if (target != null) // Check missing reference
+                if (target != null)
                 {
                     ResolveGameObject(target);
                 }
@@ -72,7 +83,10 @@ namespace MiniContainer
         {
             var buffer = ObjectListBuffer<MonoBehaviour>.Get();
 
-            if (go == null) return;
+            if (go == null)
+            {
+                return;
+            }
 
             buffer.Clear();
             go.GetComponents(buffer);
@@ -82,5 +96,17 @@ namespace MiniContainer
             }
         }
 
+        protected void OnDestroy()
+        {
+            if (_autoRegistrables == null)
+            {
+                return;
+            }
+            
+            foreach (var autoRegistrable in _autoRegistrables)
+            {
+                DIContainer.Release(autoRegistrable.GetType());
+            }
+        }
     }
 }

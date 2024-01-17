@@ -1,5 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
@@ -36,18 +35,13 @@ namespace MiniContainer
 
             DontDestroyOnLoad(gameObject);
             InitSystem();
-
         }
 
         public void SubContainerInit(SubContainer subContainer)
         {
             subContainer.Init(_diService, _container);
         }
-
-        private void Start()
-        {
-        }
-
+        
         private void Update()
         {
             _container?.RunUpdate();
@@ -57,16 +51,24 @@ namespace MiniContainer
         {
             _diService = new DIService();
             _container = _diService.GenerateContainer();
-
-            foreach (var rootContainer in _rootContainers)
+            if (_rootContainers.Count == 0)
             {
+                Errors.InvalidOperation("Root container should not be null! Check CompositionRoot in the inspector!");
+            }
+            for (var i = 0; i < _rootContainers.Count; i++)
+            {
+                var rootContainer = _rootContainers[i];
                 if (rootContainer == null)
                 {
-                    throw new NullReferenceException("Root container should not be null! Check CompositionRoot in the inspector!");
+                    Errors.InvalidOperation("Root container should not be null! Check CompositionRoot in the inspector!");
                 }
                 rootContainer.Init(_diService, _container);
             }
-
+            for (var i = 0; i < _rootContainers.Count; i++)
+            {
+                _rootContainers[i].ResolveContainer();
+            }
+            
             SceneManager.sceneLoaded += OnSceneLoaded;
             SceneManager.sceneUnloaded += OnSceneUnloaded;
         }
@@ -89,9 +91,8 @@ namespace MiniContainer
         private void OnSceneUnloaded(Scene scene)
         {
             _container?.RunSceneUnloaded(scene.buildIndex);
-            _container?.ReleaseScene();
         }
-
+        
         private void OnDestroy()
         {
             if (_objects.Length == 1)

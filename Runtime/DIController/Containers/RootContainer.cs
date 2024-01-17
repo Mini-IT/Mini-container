@@ -5,22 +5,18 @@ namespace MiniContainer
     [DefaultExecutionOrder(-6500)]
     public abstract class RootContainer : Container
     {
-        protected IDIService DIService { get; private set; }
-
-        public void Init(IDIService diService, IContainer container)
+        public void Init(IBaseDIService builder, IContainer container)
         {
-            DIService = diService;
             DIContainer = container;
-            AutoRegisterAll();
-            Register();
-            container.ResolveInstanceRegistered(false);
-            Resolve();
-            AutoResolveAll();
+            AutoRegisterAll(builder);
+            Register(builder);
         }
 
-        protected sealed override void DoRegister(IRegistrable registrable)
+        public void ResolveContainer()
         {
-            DIService.RegisterInstanceAsSelf(registrable);
+            DIContainer.ResolveInstanceRegistered();
+            Resolve();
+            AutoResolveAll();
         }
     }
 }

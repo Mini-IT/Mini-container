@@ -22,9 +22,7 @@ namespace MiniContainer
         public List<Type> InterfaceTypes { get; private set; }
 
         public ServiceLifeTime LifeTime { get; internal set; }
-
-        public bool OnSceneDestroyRelease { get; internal set; }
-
+        
         public Registration As<TInterface>()
             => As(typeof(TInterface));
 
@@ -86,7 +84,7 @@ namespace MiniContainer
         {
             if (!interfaceType.IsAssignableFrom(ImplementationType))
             {
-                throw new Exception($"{ImplementationType} is not assignable from {interfaceType}");
+                Errors.InvalidOperation($"{ImplementationType} is not assignable from {interfaceType}");
             }
 
             InterfaceTypes ??= new List<Type>();

@@ -1,67 +1,86 @@
 ﻿using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Linq;
 
 namespace MiniContainer
 {
-    public class DependencyObject
+    public class DependencyObject : IDisposable
     {
-        internal Type ServiceType { get; }
+        internal Type ServiceType { get; set; }
 
         internal Type ImplementationType { get; }
-
-        internal bool OnSceneDestroyRelease { get; }
-
-        internal bool IsResolved { get; set; }
-
-        internal List<Type> InterfaceTypes { get; }
         
+        internal List<Type> InterfaceTypes { get; }
+
         internal object Implementation { get; set; }
-
-        internal ConcurrentDictionary<int, WeakReference> WeakReferenceMap { get; } = new ConcurrentDictionary<int, WeakReference>();
-
-        internal WeakReference<IDisposable> Disposable { get; set; }
         
         internal ServiceLifeTime LifeTime { get; }
-
-        internal ConcurrentDictionary<int, Listeners> ListenersMap { get; } = new ConcurrentDictionary<int, Listeners>();
-
-        internal int WeakReferenceCount { get; set; }
-
-        internal object GetOrSetInstance
-        {
-            get => LifeTime == ServiceLifeTime.Singleton ? Implementation : WeakReferenceMap.Last().Value.Target;
-            set
-            {
-                if (LifeTime == ServiceLifeTime.Singleton)
-                {
-                    Implementation = value;
-                }
-                else
-                {
-                    WeakReferenceMap.TryAdd(WeakReferenceCount, new WeakReference(value));
-                }
-            }
-        }
         
-        internal Listeners GetListeners()
-        {
-            if (!ListenersMap.TryGetValue(WeakReferenceCount, out var listeners))
-            {            
-                listeners = ListenersMap[WeakReferenceCount] = new Listeners();
-            }
-            return listeners;
-        }
+        internal Listeners Listeners { get; }
         
-        internal DependencyObject(Type serviceType, Type implementationType, object implementation, ServiceLifeTime lifeTime, List<Type> interfaceTypes, bool onSceneDestroyRelease)
+        private IDisposable _disposable;
+
+        internal DependencyObject(Type serviceType, Type implementationType, object implementation,
+            ServiceLifeTime lifeTime, List<Type> interfaceTypes)
         {
+            Listeners = new Listeners();
             ServiceType = serviceType;
             LifeTime = lifeTime;
             ImplementationType = implementationType;
             Implementation = implementation;
             InterfaceTypes = interfaceTypes;
-            OnSceneDestroyRelease = onSceneDestroyRelease;
+        }
+        
+        internal DependencyObject(DependencyObject dependencyObject)
+        {
+            Listeners = new Listeners();
+            ServiceType = dependencyObject.ServiceType;
+            LifeTime = dependencyObject.LifeTime;
+            ImplementationType = dependencyObject.ImplementationType;
+            Implementation = dependencyObject.Implementation;
+            InterfaceTypes = dependencyObject.InterfaceTypes;
+        }
+
+        public void TryToSetDisposable()
+        {
+            if (Implementation is IDisposable disposable)
+            {
+                _disposable = disposable;
+            }
+        }
+
+        public void TryToSetListeners()
+        {
+            if (Implementation is IContainerSceneLoadedListener containerSceneLoaded)
+            {
+                Listeners.ContainerSceneLoaded = containerSceneLoaded;
+            }
+            
+            if (Implementation is IContainerUpdateListener containerUpdate)
+            {
+                Listeners.ContainerUpdate = containerUpdate;
+            }
+            
+            if (Implementation is IContainerSceneUnloadedListener containerSceneUnloaded)
+            {
+                Listeners.ContainerSceneUnloaded = containerSceneUnloaded;
+            }
+
+            if (Implementation is IContainerApplicationFocusListener containerApplicationFocus)
+            {
+                Listeners.ContainerApplicationFocus = containerApplicationFocus;
+            }
+
+            if (Implementation is IContainerApplicationPauseListener containerApplicationPause)
+            {
+                Listeners.ContainerApplicationPause = containerApplicationPause;
+            }
+        }
+
+        public void Dispose()
+        {
+            Implementation = null;
+            _disposable?.Dispose();
+            Listeners.Dispose();
         }
     }
 }
