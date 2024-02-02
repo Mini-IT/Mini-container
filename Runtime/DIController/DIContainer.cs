@@ -564,6 +564,11 @@ namespace MiniContainer
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Release(Type type)
         {
+            if (ServiceDictionary.Count == 0)
+            {
+                return;
+            }
+            
             if (!ServiceDictionary[0].TryGetValue(type, out var value))
             {
                 return;
