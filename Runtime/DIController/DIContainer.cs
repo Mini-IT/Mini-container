@@ -14,6 +14,7 @@ namespace MiniContainer
         private readonly List<ConstructorInfo> _objectGraph;
         private readonly List<IRegistration> _registrations;
         private readonly ConcurrentDictionary<int, ConcurrentDictionary<Type, DependencyObject>> _serviceDictionary;
+
         private ConcurrentDictionary<int, ConcurrentDictionary<Type, DependencyObject>> ServiceDictionary
         {
             get
@@ -38,7 +39,7 @@ namespace MiniContainer
         {
             return _currentScopeID;
         }
-        
+
         public void SetCurrentScope(int scopeID)
         {
             if (ServiceDictionary.ContainsKey(scopeID))
@@ -101,6 +102,7 @@ namespace MiniContainer
                 {
                     continue;
                 }
+
                 any = true;
                 break;
             }
@@ -167,7 +169,7 @@ namespace MiniContainer
             {
                 return implementation;
             }
-            
+
             var dependencyObject = ResolveType(serviceType);
 
             var impl = dependencyObject.Implementation;
@@ -188,6 +190,7 @@ namespace MiniContainer
             {
                 return false;
             }
+
             if (dependencyObject is ComponentDependencyObject componentDependencyObject)
             {
                 if (componentDependencyObject.Prefab == null)
@@ -221,9 +224,9 @@ namespace MiniContainer
                         ? UnityEngine.Object.Instantiate(componentDependencyObject.Prefab)
                         : UnityEngine.Object.Instantiate(componentDependencyObject.Prefab,
                             componentDependencyObject.Parent);
-                    
+
                     ResolveObject(implementation);
-                    
+
                     if (wasActive)
                     {
                         implementation.gameObject.SetActive(true);
@@ -328,15 +331,15 @@ namespace MiniContainer
                 {
                     Errors.InvalidOperation($"Cannot instantiate abstract classes or interfaces {actualType}");
                 }
-                
+
                 _constructorInfo = GetConstructorInfo(actualType);
-                
+
                 if (_constructorInfo != null)
                 {
                     CheckCircularDependency();
-                
+
                     _objectGraph.Add(_constructorInfo);
-                
+
                     var objectActivator = Activator.GetActivator<object>(_constructorInfo);
                     var parameters = SelectParameters(_constructorInfo.GetParameters());
                     dependencyObject.Implementation = objectActivator.Invoke(parameters);
@@ -345,18 +348,18 @@ namespace MiniContainer
                 {
                     dependencyObject.Implementation = Activator.CreateDefaultConstructor(actualType).Invoke();
                 }
-                
+
                 ResolveObject(dependencyObject.Implementation);
-                
+
                 if (dependencyObject.LifeTime != ServiceLifeTime.Transient)
                 {
                     CheckInterfaces(dependencyObject);
                     TryToSetImplementationTypes(dependencyObject);
                 }
-                
+
                 TryToInitialize(dependencyObject);
             }
-            
+
             _constructorInfo = null;
             _objectGraph.Clear();
             return dependencyObject;
@@ -377,7 +380,11 @@ namespace MiniContainer
                 ConstructorInfo obj = null;
                 if (_objectGraph.Count > 0)
                 {
+                    #if UNITY_2022_1_OR_NEWER
                     obj = _objectGraph[^1];
+                    #else
+                    obj = _objectGraph[_objectGraph.Count - 1];
+                    #endif
                 }
 
                 Errors.InvalidOperation(obj == null
