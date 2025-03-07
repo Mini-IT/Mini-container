@@ -1,19 +1,19 @@
 {
   "unity": "2020.4", 
+  "name": "com.miniit.dicontainer",
+  "version": "2.1.0",
   "dependencies": {
   }, 
   "author": {
     "name": "Mini IT", 
     "url": "https://mini-it.com/"
   }, 
-  "displayName": "Mini DI Container", 
   "keywords": [
     "DI", 
     "Dependency Injection",
     "Injection",
     "Code Injection"
   ], 
-  "description": "DI Container", 
-  "version": "2.1.0", 
-  "name": "com.miniit.dicontainer"
+  "displayName": "Mini DI Container", 
+  "description": "DI Container"
 }
