@@ -53,14 +53,14 @@ namespace MiniContainer
             _container = _diService.GenerateContainer();
             if (_rootContainers.Count == 0)
             {
-                Errors.InvalidOperation("Root container should not be null! Check CompositionRoot in the inspector!");
+                Logs.InvalidOperation("Root container should not be null! Check CompositionRoot in the inspector!");
             }
             for (var i = 0; i < _rootContainers.Count; i++)
             {
                 var rootContainer = _rootContainers[i];
                 if (rootContainer == null)
                 {
-                    Errors.InvalidOperation("Root container should not be null! Check CompositionRoot in the inspector!");
+                    Logs.InvalidOperation("Root container should not be null! Check CompositionRoot in the inspector!");
                 }
                 rootContainer.Init(_diService, _container);
             }

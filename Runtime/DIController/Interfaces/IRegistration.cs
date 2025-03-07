@@ -12,6 +12,7 @@ namespace MiniContainer
         string GameObjectName { get; }
         Type ImplementationType { get; }
         object Implementation { get; }
+        Func<object> GetImplementation { get; }
         List<Type> InterfaceTypes { get; }
         ServiceLifeTime LifeTime { get; }
         Registration As<TInterface>();
