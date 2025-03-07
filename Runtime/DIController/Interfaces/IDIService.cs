@@ -2,6 +2,7 @@
 {
     public interface IDIService : IBaseDIService
     {
-        DIContainer GenerateContainer();
+        DIContainer GenerateContainer(bool enablePooling = true, 
+            bool enableParallelInitialization = true);
     }
 }

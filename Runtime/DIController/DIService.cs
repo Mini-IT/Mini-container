@@ -30,9 +30,10 @@ namespace MiniContainer
             _ignoreTypeList.Add(type);
         }
 
-        public DIContainer GenerateContainer()
+        public DIContainer GenerateContainer(bool enablePooling = true, 
+            bool enableParallelInitialization = true)
         {
-            var container = new DIContainer(_registrations, _ignoreTypeList);
+            var container = new DIContainer(_registrations, _ignoreTypeList, enablePooling, enableParallelInitialization);
             this.RegisterInstance(new ScopeManager(container)).AsImplementedInterfaces();
             return container;
         }
