@@ -13,9 +13,7 @@ namespace MiniContainer
         // Maximum pool size for each type
         private const int MaxPoolSize = 32;
         
-        private ConstructorInfo _constructorInfo;
         private readonly List<Type> _ignoreTypeList;
-        private readonly List<ConstructorInfo> _objectGraph;
         private readonly HashSet<int> _objectGraphHashCodes;
         private readonly List<IRegistration> _registrations;
         private readonly ConcurrentDictionary<int, Dictionary<Type, DependencyObject>> _serviceDictionary;
@@ -31,6 +29,7 @@ namespace MiniContainer
         private readonly bool _enablePooling;
         // Flag to enable/disable parallel initialization
         private readonly bool _enableParallelInitialization;
+        private ConstructorInfo _constructorInfo;
 
         public event Action OnContainerUpdate;
         public event Action<int> OnContainerSceneLoaded;
@@ -57,7 +56,6 @@ namespace MiniContainer
             _propertyCache = new Dictionary<Type, PropertyInfo[]>(128);
             _methodCache = new Dictionary<Type, MethodInfo[]>(128);
             _constructorCache = new Dictionary<Type, ConstructorInfo[]>(128);
-            _objectGraph = new List<ConstructorInfo>(16);
             _objectGraphHashCodes = new HashSet<int>(16);
             _ignoreTypeList = ignoreTypeList;
             _registrations = registrations;
@@ -543,8 +541,6 @@ namespace MiniContainer
                     if (_constructorInfo != null)
                     {
                         CheckCircularDependency();
-                
-                        _objectGraph.Add(_constructorInfo);
                         _objectGraphHashCodes.Add(_constructorInfo.GetHashCode());
                 
                         var objectActivator = Activator.GetActivator(_constructorInfo);
@@ -564,7 +560,6 @@ namespace MiniContainer
             }
             
             _constructorInfo = null;
-            _objectGraph.Clear();
             _objectGraphHashCodes.Clear();
             return dependencyObject;
         }
@@ -587,15 +582,9 @@ namespace MiniContainer
                 return dependencyObject;
             }
             
-            ConstructorInfo obj = null;
-            if (_objectGraph.Count > 0)
-            {
-                obj = _objectGraph[^1];
-            }
-
-            Logs.InvalidOperation(obj == null
+            Logs.InvalidOperation(_constructorInfo == null
                 ? $"There is no such a service {serviceType} registered"
-                : $"{obj.DeclaringType} tried to find {serviceType} but dependency is not found.");
+                : $"{_constructorInfo.DeclaringType} tried to find {serviceType} but dependency is not found.");
             
             return null;
         }
@@ -793,7 +782,6 @@ namespace MiniContainer
             }
 
             ServiceDictionary.Clear();
-            _objectGraph.Clear();
             
             // Очистка пула объектов
             if (_enablePooling)
