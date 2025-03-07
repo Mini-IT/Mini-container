@@ -230,5 +230,29 @@ namespace MiniContainer
 		{
 			return Register<TService, TImplementation>(diService, ServiceLifeTime.Transient);
 		}
-	}
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static Registration RegisterSingleton<TService>(
+            this IBaseDIService diService,
+            Func<TService> implementationConfiguration)
+        {
+            return Register(diService, implementationConfiguration, ServiceLifeTime.Singleton);
+        }
+        
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static Registration RegisterScoped<TService>(
+            this IBaseDIService diService,
+            Func<TService> implementationConfiguration)
+        {
+            return Register(diService, implementationConfiguration, ServiceLifeTime.Scoped);
+        }
+        
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static Registration RegisterTransient<TService>(
+            this IBaseDIService diService,
+            Func<TService> implementationConfiguration)
+        {
+            return Register(diService, implementationConfiguration, ServiceLifeTime.Transient);
+        }
+    }
 }
