@@ -6,13 +6,13 @@ using System.Runtime.CompilerServices;
 
 namespace MiniContainer
 {
-    public static class Activator
+    internal static class Activator
     {
         // String constants
-        private const string Args = "args";
-        private const string Instance = "instance";
-        private const string Value = "value";
-        private const string Parameters = "parameters";
+        private const string ConstArgs = "args";
+        private const string ConstInstance = "instance";
+        private const string ConstValue = "value";
+        private const string ConstParameters = "parameters";
         
         internal delegate object ObjectActivator(params object[] args);
         
@@ -48,7 +48,7 @@ namespace MiniContainer
             var paramsInfo = ctor.GetParameters();
 
             //create a single param of type object[]
-            var param = Expression.Parameter(typeof(object[]), Args);
+            var param = Expression.Parameter(typeof(object[]), ConstArgs);
 
             var argsExp = new Expression[paramsInfo.Length];
 
@@ -109,7 +109,7 @@ namespace MiniContainer
         /// Creates a fast property setter using Expression Trees
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal static Action<object, object> CreatePropertySetter(PropertyInfo property)
+        private static Action<object, object> CreatePropertySetter(PropertyInfo property)
         {
             // Check cache
             if (_propertySetterCache.TryGetValue(property, out var setter))
@@ -117,8 +117,8 @@ namespace MiniContainer
                 return setter;
             }
             
-            var instanceParam = Expression.Parameter(typeof(object), Instance);
-            var valueParam = Expression.Parameter(typeof(object), Value);
+            var instanceParam = Expression.Parameter(typeof(object), ConstInstance);
+            var valueParam = Expression.Parameter(typeof(object), ConstValue);
             
             var instanceCast = Expression.Convert(instanceParam, property.DeclaringType);
             var valueCast = Expression.Convert(valueParam, property.PropertyType);
@@ -137,7 +137,7 @@ namespace MiniContainer
         /// Creates a fast field setter using Expression Trees
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal static Action<object, object> CreateFieldSetter(FieldInfo field)
+        private static Action<object, object> CreateFieldSetter(FieldInfo field)
         {
             // Check cache
             if (_fieldSetterCache.TryGetValue(field, out var setter))
@@ -145,8 +145,8 @@ namespace MiniContainer
                 return setter;
             }
             
-            var instanceParam = Expression.Parameter(typeof(object), Instance);
-            var valueParam = Expression.Parameter(typeof(object), Value);
+            var instanceParam = Expression.Parameter(typeof(object), ConstInstance);
+            var valueParam = Expression.Parameter(typeof(object), ConstValue);
             
             var instanceCast = Expression.Convert(instanceParam, field.DeclaringType);
             var valueCast = Expression.Convert(valueParam, field.FieldType);
@@ -166,7 +166,7 @@ namespace MiniContainer
         /// Creates a fast method invoker using Expression Trees
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal static Func<object, object[], object> CreateMethodInvoker(MethodInfo method)
+        private static Func<object, object[], object> CreateMethodInvoker(MethodInfo method)
         {
             // Check cache
             if (_methodInvokerCache.TryGetValue(method, out var invoker))
@@ -174,8 +174,8 @@ namespace MiniContainer
                 return invoker;
             }
             
-            var instanceParam = Expression.Parameter(typeof(object), Instance);
-            var parametersParam = Expression.Parameter(typeof(object[]), Parameters);
+            var instanceParam = Expression.Parameter(typeof(object), ConstInstance);
+            var parametersParam = Expression.Parameter(typeof(object[]), ConstParameters);
             
             var instanceCast = Expression.Convert(instanceParam, method.DeclaringType);
             
