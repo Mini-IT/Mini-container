@@ -8,9 +8,9 @@ namespace MiniContainer
     public class CompositionRoot : MonoBehaviour
     {
 #pragma warning disable 0649 // is never assigned to, and will always have its default value null.
-        public static CompositionRoot Instance;
+        public static CompositionRoot Instance { get; private set; }
         private CompositionRoot[] _objects;
-
+ 
         [SerializeField]
         private List<RootContainer> _rootContainers;
 
