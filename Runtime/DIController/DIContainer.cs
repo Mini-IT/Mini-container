@@ -100,9 +100,12 @@ namespace MiniContainer
                 return;
             }
             
-            // Pre-allocate memory for dictionary
-            var mainScope = new Dictionary<Type, DependencyObject>(_registrations.Count * 2);
-            _serviceDictionary[0] = mainScope;
+            if (!_serviceDictionary.TryGetValue(0, out var mainScope))
+            {
+                // Pre-allocate memory for dictionary
+                mainScope = new Dictionary<Type, DependencyObject>(_registrations.Count * 2);
+                _serviceDictionary[0] = mainScope;
+            }
             
             // Pre-calculate total interfaces count for more accurate memory allocation
             int totalInterfaces = 0;
@@ -596,7 +599,6 @@ namespace MiniContainer
             {
                 case ServiceLifeTime.Scoped:
                 {
-                    // Используем TryGetValue вместо индексатора для избежания создания временных объектов
                     if (_serviceDictionary.TryGetValue(_currentScopeID, out var scope))
                     {
                         lock (_dictionaryLock)
