@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Runtime.CompilerServices;
 using UnityEngine;
-using Object = UnityEngine.Object;
 
 namespace MiniContainer
 {
@@ -78,7 +77,23 @@ namespace MiniContainer
 
             return diService.Register(registration);
         }
+        
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static Registration Register<TService>(
+            this IBaseDIService diService,
+            Func<TService> implementationConfiguration,
+            ServiceLifeTime serviceLifeTime = ServiceLifeTime.Singleton)
+        {
+            var registration = new Registration();
+            registration.ImplementationType = typeof(TService);
+            registration.GetImplementation = () => implementationConfiguration.Invoke();
+            registration.As<TService>();
+            registration.RegistrationType = RegistrationType.Base;
+            registration.LifeTime = serviceLifeTime;
 
+            return diService.Register(registration);
+        }
+        
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static Registration RegisterInstance<TService>(
             this IBaseDIService diService,
@@ -147,7 +162,7 @@ namespace MiniContainer
         }
         
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static Registration RegisterFactory<TService>(
+        public static void RegisterFactory<TService>(
             this IBaseDIService diService,
             IContainer container)
         {
@@ -159,7 +174,7 @@ namespace MiniContainer
             registration.LifeTime = ServiceLifeTime.Singleton;
             registration.Implementation = factory;
 
-            return diService.Register(registration);
+            diService.Register(registration);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -215,5 +230,29 @@ namespace MiniContainer
 		{
 			return Register<TService, TImplementation>(diService, ServiceLifeTime.Transient);
 		}
-	}
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static Registration RegisterSingleton<TService>(
+            this IBaseDIService diService,
+            Func<TService> implementationConfiguration)
+        {
+            return Register(diService, implementationConfiguration, ServiceLifeTime.Singleton);
+        }
+        
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static Registration RegisterScoped<TService>(
+            this IBaseDIService diService,
+            Func<TService> implementationConfiguration)
+        {
+            return Register(diService, implementationConfiguration, ServiceLifeTime.Scoped);
+        }
+        
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static Registration RegisterTransient<TService>(
+            this IBaseDIService diService,
+            Func<TService> implementationConfiguration)
+        {
+            return Register(diService, implementationConfiguration, ServiceLifeTime.Transient);
+        }
+    }
 }

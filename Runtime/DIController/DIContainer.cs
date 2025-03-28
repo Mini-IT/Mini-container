@@ -3,19 +3,41 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Reflection;
 using System.Runtime.CompilerServices;
+using System.Threading.Tasks;
 using UnityEngine;
 
 namespace MiniContainer
 {
-    public class DIContainer : IContainer
+    public class DIContainer : IContainer, IContainerListener
     {
-        private ConstructorInfo _constructorInfo;
+        // Maximum pool size for each type
+        private const int MaxPoolSize = 32;
+        
         private readonly List<Type> _ignoreTypeList;
-        private readonly List<ConstructorInfo> _objectGraph;
+        private readonly HashSet<int> _objectGraphHashCodes;
         private readonly List<IRegistration> _registrations;
-        private readonly ConcurrentDictionary<int, ConcurrentDictionary<Type, DependencyObject>> _serviceDictionary;
+        private readonly ConcurrentDictionary<int, Dictionary<Type, DependencyObject>> _serviceDictionary;
+        private readonly object _dictionaryLock = new object();
+        // Cache for reflection
+        private readonly Dictionary<Type, FieldInfo[]> _fieldCache;
+        private readonly Dictionary<Type, PropertyInfo[]> _propertyCache;
+        private readonly Dictionary<Type, MethodInfo[]> _methodCache;
+        private readonly Dictionary<Type, ConstructorInfo[]> _constructorCache;
+        // Object pool for Transient dependencies
+        private readonly Dictionary<Type, Stack<object>> _objectPool;
+        // Flag to enable/disable pooling
+        private readonly bool _enablePooling;
+        // Flag to enable/disable parallel initialization
+        private readonly bool _enableParallelInitialization;
+        private ConstructorInfo _constructorInfo;
 
-        private ConcurrentDictionary<int, ConcurrentDictionary<Type, DependencyObject>> ServiceDictionary
+        public event Action OnContainerUpdate;
+        public event Action<int> OnContainerSceneLoaded;
+        public event Action<int> OnContainerSceneUnloaded;
+        public event Action<bool> OnContainerApplicationFocus;
+        public event Action<bool> OnContainerApplicationPause;
+        
+        private ConcurrentDictionary<int, Dictionary<Type, DependencyObject>> ServiceDictionary
         {
             get
             {
@@ -24,14 +46,22 @@ namespace MiniContainer
             }
         }
 
-        private static int _currentScopeID = -1;
-
-        public DIContainer(List<IRegistration> registrations, List<Type> ignoreTypeList)
+        private int _currentScopeID = -1;
+  
+        public DIContainer(List<IRegistration> registrations, List<Type> ignoreTypeList, bool enablePooling = true, 
+            bool enableParallelInitialization = true)
         {
-            _serviceDictionary = new ConcurrentDictionary<int, ConcurrentDictionary<Type, DependencyObject>>();
-            _objectGraph = new List<ConstructorInfo>();
+            _serviceDictionary = new ConcurrentDictionary<int, Dictionary<Type, DependencyObject>>();
+            _fieldCache = new Dictionary<Type, FieldInfo[]>(128);
+            _propertyCache = new Dictionary<Type, PropertyInfo[]>(128);
+            _methodCache = new Dictionary<Type, MethodInfo[]>(128);
+            _constructorCache = new Dictionary<Type, ConstructorInfo[]>(128);
+            _objectGraphHashCodes = new HashSet<int>(16);
             _ignoreTypeList = ignoreTypeList;
             _registrations = registrations;
+            _objectPool = new Dictionary<Type, Stack<object>>(64);
+            _enablePooling = enablePooling;
+            _enableParallelInitialization = enableParallelInitialization;
             CreateScope();
         }
 
@@ -39,7 +69,7 @@ namespace MiniContainer
         {
             return _currentScopeID;
         }
-
+        
         public void SetCurrentScope(int scopeID)
         {
             if (ServiceDictionary.ContainsKey(scopeID))
@@ -48,7 +78,7 @@ namespace MiniContainer
             }
             else
             {
-                Errors.InvalidOperation($"Scope with ID:{scopeID} doesn't exist");
+                Logs.InvalidOperation($"Scope with ID:{scopeID} doesn't exist");
             }
         }
 
@@ -56,94 +86,117 @@ namespace MiniContainer
         public int CreateScope()
         {
             _currentScopeID++;
-            _serviceDictionary[_currentScopeID] = new ConcurrentDictionary<Type, DependencyObject>();
-            Errors.Log($"<color=green> New scope has been created with ID: {_currentScopeID}</color>");
+            // Pre-allocate memory for dictionary
+            var newScope = new Dictionary<Type, DependencyObject>(32);
+            _serviceDictionary[_currentScopeID] = newScope;
+            Logs.Log($"<color=green> New scope has been created with ID: {_currentScopeID}</color>");
             return _currentScopeID;
         }
 
         private void RegistrationProcess()
         {
-            if (_registrations.Count > 0)
+            if (_registrations.Count <= 0)
             {
-                for (var i = 0; i < _registrations.Count; i++)
+                return;
+            }
+            
+            if (!_serviceDictionary.TryGetValue(0, out var mainScope))
+            {
+                // Pre-allocate memory for dictionary
+                mainScope = new Dictionary<Type, DependencyObject>(_registrations.Count * 2);
+                _serviceDictionary[0] = mainScope;
+            }
+            
+            // Pre-calculate total interfaces count for more accurate memory allocation
+            int totalInterfaces = 0;
+            foreach (var registration in _registrations)
+            {
+                totalInterfaces += registration.InterfaceTypes.Count;
+            }
+            
+            // Allocate memory with some extra space
+            mainScope.EnsureCapacity(Math.Max(totalInterfaces, _registrations.Count * 2));
+            
+            for (var i = 0; i < _registrations.Count; i++)
+            {
+                var registration = _registrations[i];
+                for (var j = 0; j < registration.InterfaceTypes.Count; j++)
                 {
-                    for (var j = 0; j < _registrations[i].InterfaceTypes.Count; j++)
+                    var interfaceType = registration.InterfaceTypes[j];
+                    if (IsIgnoreType(interfaceType))
                     {
-                        var interfaceType = _registrations[i].InterfaceTypes[j];
-                        if (Any(interfaceType))
-                        {
-                            _registrations[i].InterfaceTypes.Remove(interfaceType);
-                            j--;
-                            continue;
-                        }
+                        registration.InterfaceTypes.RemoveAt(j);
+                        j--;
+                        continue;
+                    }
 
-                        var dependencyObject = GetDependencyObject(i, interfaceType);
+                    var dependencyObject = GetDependencyObject(i, interfaceType);
 
-                        if (dependencyObject == null) continue;
-                        if (!_serviceDictionary[0].TryAdd(dependencyObject.ServiceType, dependencyObject))
+                    if (dependencyObject == null) continue;
+                    
+                    lock (_dictionaryLock)
+                    {
+                        if (!mainScope.TryAdd(dependencyObject.ServiceType, dependencyObject))
                         {
-                            Errors.InvalidOperation($"Already exist {dependencyObject.ServiceType}");
+                            Logs.InvalidOperation($"Already exist {dependencyObject.ServiceType}");
                         }
                     }
                 }
-
-                _registrations.Clear();
             }
+
+            _registrations.Clear();
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private bool Any(Type interfaceType)
+        private bool IsIgnoreType(Type interfaceType)
         {
-            var any = false;
-            for (var index = 0; index < _ignoreTypeList.Count; index++)
+            var count = _ignoreTypeList.Count;
+            for (var i = 0; i < count; i++)
             {
-                var t = _ignoreTypeList[index];
-                if (t != interfaceType)
+                if (_ignoreTypeList[i] == interfaceType)
                 {
-                    continue;
+                    return true;
                 }
-
-                any = true;
-                break;
             }
-
-            return any;
+            return false;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private DependencyObject GetDependencyObject(int i, Type interfaceType)
         {
+            var registration = _registrations[i];
             DependencyObject dependencyObject = null;
 
-            switch (_registrations[i].RegistrationType)
+            switch (registration.RegistrationType)
             {
                 case RegistrationType.Base:
                     dependencyObject = new DependencyObject(
                         interfaceType,
-                        _registrations[i].ImplementationType,
-                        _registrations[i].Implementation,
-                        _registrations[i].LifeTime,
-                        _registrations[i].InterfaceTypes);
+                        registration.ImplementationType,
+                        registration.Implementation,
+                        registration.LifeTime,
+                        registration.InterfaceTypes,
+                        registration.GetImplementation);
 
                     break;
                 case RegistrationType.Component:
                     dependencyObject = new ComponentDependencyObject(
                         interfaceType,
-                        _registrations[i].ImplementationType,
-                        _registrations[i].Implementation,
-                        _registrations[i].LifeTime,
-                        _registrations[i].InterfaceTypes,
-                        _registrations[i].Prefab,
-                        _registrations[i].Parent,
-                        _registrations[i].GameObjectName);
+                        registration.ImplementationType,
+                        registration.Implementation,
+                        registration.LifeTime,
+                        registration.InterfaceTypes,
+                        registration.Prefab,
+                        registration.Parent,
+                        registration.GameObjectName);
                     break;
                 case RegistrationType.Instance:
                     dependencyObject = new InstanceRegistrationDependencyObject(
                         interfaceType,
-                        _registrations[i].ImplementationType,
-                        _registrations[i].Implementation,
-                        _registrations[i].LifeTime,
-                        _registrations[i].InterfaceTypes);
+                        registration.ImplementationType,
+                        registration.Implementation,
+                        registration.LifeTime,
+                        registration.InterfaceTypes);
                     break;
             }
 
@@ -153,12 +206,126 @@ namespace MiniContainer
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void ResolveInstanceRegistered()
         {
-            foreach (var dependencyObject in ServiceDictionary[0])
+            var mainScope = ServiceDictionary[0];
+            
+            if (!_enableParallelInitialization)
             {
-                if (dependencyObject.Value is InstanceRegistrationDependencyObject)
+                foreach (var dependencyObject in mainScope.Values)
                 {
-                    ResolveObject(dependencyObject.Value.Implementation);
+                    if (dependencyObject is InstanceRegistrationDependencyObject)
+                    {
+                        ResolveObject(dependencyObject.Implementation);
+                    }
                 }
+                return;
+            }
+            
+            // Собираем все объекты, которые нужно инициализировать
+            var instanceObjects = new List<object>();
+            foreach (var dependencyObject in mainScope.Values)
+            {
+                if (dependencyObject is InstanceRegistrationDependencyObject)
+                {
+                    instanceObjects.Add(dependencyObject.Implementation);
+                }
+            }
+            
+            // Параллельно инициализируем объекты
+            if (instanceObjects.Count > 0)
+            {
+                Parallel.ForEach(instanceObjects, implementation =>
+                {
+                    // Для каждого объекта создаем локальные кэши, чтобы избежать блокировок
+                    var localFieldCache = new Dictionary<Type, FieldInfo[]>();
+                    var localPropertyCache = new Dictionary<Type, PropertyInfo[]>();
+                    var localMethodCache = new Dictionary<Type, MethodInfo[]>();
+                    
+                    ResolveFieldParallel(implementation, localFieldCache);
+                    ResolvePropertyParallel(implementation, localPropertyCache);
+                    ResolveMethodParallel(implementation, localMethodCache);
+                });
+            }
+        }
+        
+        // Параллельные версии методов разрешения зависимостей
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private void ResolveFieldParallel(object implementation, Dictionary<Type, FieldInfo[]> localFieldCache)
+        {
+            var type = implementation.GetType();
+            if (!localFieldCache.TryGetValue(type, out var fields))
+            {
+                fields = type.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+                localFieldCache[type] = fields;
+            }
+
+            foreach (var field in fields)
+            {
+                var attr = field.GetCustomAttribute(typeof(ResolveAttribute));
+
+                if (attr == null)
+                {
+                    continue;
+                }
+
+                var fieldImpl = ResolveType(field.FieldType).Implementation;
+                
+                // Use cached setter or create a new one
+                var setter = Activator.GetFieldSetter(field);
+                setter(implementation, fieldImpl);
+            }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private void ResolvePropertyParallel(object implementation, Dictionary<Type, PropertyInfo[]> localPropertyCache)
+        {
+            var type = implementation.GetType();
+            if (!localPropertyCache.TryGetValue(type, out var properties))
+            {
+                properties = type.GetProperties(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+                localPropertyCache[type] = properties;
+            }
+
+            foreach (var property in properties)
+            {
+                var attr = property.GetCustomAttribute(typeof(ResolveAttribute));
+
+                if (attr == null)
+                {
+                    continue;
+                }
+
+                var propertyImpl = ResolveType(property.PropertyType).Implementation;
+                
+                // Use cached setter or create a new one
+                var setter = Activator.GetPropertySetter(property);
+                setter(implementation, propertyImpl);
+            }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private void ResolveMethodParallel(object implementation, Dictionary<Type, MethodInfo[]> localMethodCache)
+        {
+            var type = implementation.GetType();
+            if (!localMethodCache.TryGetValue(type, out var methods))
+            {
+                methods = type.GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+                localMethodCache[type] = methods;
+            }
+
+            foreach (var method in methods)
+            {
+                var attr = method.GetCustomAttribute(typeof(ResolveAttribute));
+
+                if (attr == null)
+                {
+                    continue;
+                }
+
+                var parameters = SelectParameters(method.GetParameters());
+                
+                // Use cached invoker or create a new one
+                var invoker = Activator.GetMethodInvoker(method);
+                invoker(implementation, parameters);
             }
         }
 
@@ -169,13 +336,18 @@ namespace MiniContainer
             {
                 return implementation;
             }
-
+            
             var dependencyObject = ResolveType(serviceType);
-
             var impl = dependencyObject.Implementation;
 
             if (dependencyObject.LifeTime == ServiceLifeTime.Transient)
             {
+                // If object is Transient, return it to pool instead of destroying
+                if (_enablePooling && !(impl is IDisposable) && !(impl is UnityEngine.Object))
+                {
+                    ReturnToPool(serviceType, impl);
+                }
+                dependencyObject.Implementation = null;
                 dependencyObject.Dispose();
             }
 
@@ -186,58 +358,60 @@ namespace MiniContainer
         private bool IsComponentDependencyObject(Type serviceType, out Component implementation)
         {
             implementation = null;
-            if (!ServiceDictionary[0].TryGetValue(serviceType, out var dependencyObject))
+            var mainScope = ServiceDictionary[0];
+            
+            if (!mainScope.TryGetValue(serviceType, out var dependencyObject))
             {
                 return false;
             }
 
-            if (dependencyObject is ComponentDependencyObject componentDependencyObject)
+            if (dependencyObject is not ComponentDependencyObject componentDependencyObject)
             {
-                if (componentDependencyObject.Prefab == null)
+                return false;
+            }
+            
+            if (componentDependencyObject.Prefab == null)
+            {
+                var name = string.IsNullOrEmpty(componentDependencyObject.GameObjectName)
+                    ? componentDependencyObject.ServiceType.Name
+                    : componentDependencyObject.GameObjectName;
+
+                var go = new GameObject(name);
+                go.SetActive(false);
+
+                var parent = componentDependencyObject.Parent;
+                if (parent != null)
                 {
-                    var name = string.IsNullOrEmpty(componentDependencyObject.GameObjectName)
-                        ? componentDependencyObject.ServiceType.Name
-                        : componentDependencyObject.GameObjectName;
-
-                    var go = new GameObject(name);
-                    go.SetActive(false);
-
-                    var parent = componentDependencyObject.Parent;
-                    if (parent != null)
-                    {
-                        go.transform.SetParent(parent);
-                    }
-
-                    implementation = go.AddComponent(componentDependencyObject.ServiceType);
-                    ResolveObject(implementation);
-                    go.SetActive(true);
-                }
-                else
-                {
-                    var wasActive = componentDependencyObject.Prefab.gameObject.activeSelf;
-                    if (wasActive)
-                    {
-                        componentDependencyObject.Prefab.gameObject.SetActive(false);
-                    }
-
-                    implementation = componentDependencyObject.Parent == null
-                        ? UnityEngine.Object.Instantiate(componentDependencyObject.Prefab)
-                        : UnityEngine.Object.Instantiate(componentDependencyObject.Prefab,
-                            componentDependencyObject.Parent);
-
-                    ResolveObject(implementation);
-
-                    if (wasActive)
-                    {
-                        implementation.gameObject.SetActive(true);
-                        componentDependencyObject.Prefab.gameObject.SetActive(true);
-                    }
+                    go.transform.SetParent(parent);
                 }
 
-                return true;
+                implementation = go.AddComponent(componentDependencyObject.ServiceType);
+                ResolveObject(implementation);
+                go.SetActive(true);
+            }
+            else
+            {
+                var wasActive = componentDependencyObject.Prefab.gameObject.activeSelf;
+                if (wasActive)
+                {
+                    componentDependencyObject.Prefab.gameObject.SetActive(false);
+                }
+
+                implementation = componentDependencyObject.Parent == null
+                    ? UnityEngine.Object.Instantiate(componentDependencyObject.Prefab)
+                    : UnityEngine.Object.Instantiate(componentDependencyObject.Prefab,
+                        componentDependencyObject.Parent);
+                    
+                ResolveObject(implementation);
+                    
+                if (wasActive)
+                {
+                    implementation.gameObject.SetActive(true);
+                    componentDependencyObject.Prefab.gameObject.SetActive(true);
+                }
             }
 
-            return false;
+            return true;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -251,8 +425,12 @@ namespace MiniContainer
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void ResolveProperty(object implementation)
         {
-            var properties = implementation.GetType()
-                .GetProperties(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+            var type = implementation.GetType();
+            if (!_propertyCache.TryGetValue(type, out var properties))
+            {
+                properties = type.GetProperties(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+                _propertyCache[type] = properties;
+            }
 
             foreach (var property in properties)
             {
@@ -264,15 +442,22 @@ namespace MiniContainer
                 }
 
                 var propertyImpl = ResolveType(property.PropertyType).Implementation;
-                property.SetValue(implementation, propertyImpl);
+                
+                // Use cached setter or create a new one
+                var setter = Activator.GetPropertySetter(property);
+                setter(implementation, propertyImpl);
             }
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void ResolveField(object implementation)
         {
-            var fields = implementation.GetType()
-                .GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+            var type = implementation.GetType();
+            if (!_fieldCache.TryGetValue(type, out var fields))
+            {
+                fields = type.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+                _fieldCache[type] = fields;
+            }
 
             foreach (var field in fields)
             {
@@ -284,15 +469,22 @@ namespace MiniContainer
                 }
 
                 var fieldImpl = ResolveType(field.FieldType).Implementation;
-                field.SetValue(implementation, fieldImpl);
+                
+                // Use cached setter or create a new one
+                var setter = Activator.GetFieldSetter(field);
+                setter(implementation, fieldImpl);
             }
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void ResolveMethod(object implementation)
         {
-            var methods = implementation.GetType()
-                .GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+            var type = implementation.GetType();
+            if (!_methodCache.TryGetValue(type, out var methods))
+            {
+                methods = type.GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+                _methodCache[type] = methods;
+            }
 
             foreach (var method in methods)
             {
@@ -304,7 +496,10 @@ namespace MiniContainer
                 }
 
                 var parameters = SelectParameters(method.GetParameters());
-                method.Invoke(implementation, parameters);
+                
+                // Use cached invoker or create a new one
+                var invoker = Activator.GetMethodInvoker(method);
+                invoker(implementation, parameters);
             }
         }
 
@@ -324,48 +519,55 @@ namespace MiniContainer
                 {
                     dependencyObject = value;
                 }
-
-                var actualType = dependencyObject.ImplementationType;
-
-                if (actualType.IsAbstract || actualType.IsInterface)
+                
+                if (dependencyObject.TryGetImplementation(out var implementation))
                 {
-                    Errors.InvalidOperation($"Cannot instantiate abstract classes or interfaces {actualType}");
+                    dependencyObject.Implementation = implementation;
                 }
-
-                _constructorInfo = GetConstructorInfo(actualType);
-
-                if (_constructorInfo != null)
+                else if (_enablePooling && dependencyObject.LifeTime == ServiceLifeTime.Transient && 
+                         TryGetFromPool(dependencyObject.ImplementationType, out var pooledObject))
                 {
-                    CheckCircularDependency();
-
-                    _objectGraph.Add(_constructorInfo);
-
-                    var objectActivator = Activator.GetActivator<object>(_constructorInfo);
-                    var parameters = SelectParameters(_constructorInfo.GetParameters());
-                    dependencyObject.Implementation = objectActivator.Invoke(parameters);
+                    // Get object from pool if available
+                    dependencyObject.Implementation = pooledObject;
                 }
                 else
                 {
-                    dependencyObject.Implementation = Activator.CreateDefaultConstructor(actualType).Invoke();
-                }
+                    var actualType = dependencyObject.ImplementationType;
 
+                    if (actualType.IsAbstract || actualType.IsInterface)
+                    {
+                        Logs.InvalidOperation($"Cannot instantiate abstract classes or interfaces {actualType}");
+                    }
+                    
+                    _constructorInfo = GetConstructorInfo(actualType);
+                
+                    if (_constructorInfo != null)
+                    {
+                        CheckCircularDependency();
+                        _objectGraphHashCodes.Add(_constructorInfo.GetHashCode());
+                
+                        var objectActivator = Activator.GetActivator(_constructorInfo);
+                        var parameters = SelectParameters(_constructorInfo.GetParameters());
+                        dependencyObject.Implementation = objectActivator.Invoke(parameters);
+                    }
+                    else
+                    {
+                        dependencyObject.Implementation = Activator.CreateDefaultConstructor(actualType).Invoke();
+                    }
+                }
+                
                 ResolveObject(dependencyObject.Implementation);
-
-                if (dependencyObject.LifeTime != ServiceLifeTime.Transient)
-                {
-                    CheckInterfaces(dependencyObject);
-                    TryToSetImplementationTypes(dependencyObject);
-                }
-
-                TryToInitialize(dependencyObject);
+                CheckInterfaces(dependencyObject);
+                SetImplementationTypes(dependencyObject);
+                Initialize(dependencyObject);
             }
-
+            
             _constructorInfo = null;
-            _objectGraph.Clear();
+            _objectGraphHashCodes.Clear();
             return dependencyObject;
         }
 
-        private static void TryToInitialize(DependencyObject dependencyObject)
+        private static void Initialize(DependencyObject dependencyObject)
         {
             if (dependencyObject.Implementation is IContainerInitializable initializable)
             {
@@ -373,47 +575,57 @@ namespace MiniContainer
             }
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private DependencyObject TryGetDependencyObject(Type serviceType)
         {
-            if (!ServiceDictionary[0].TryGetValue(serviceType, out var dependencyObject))
+            // Use TryGetValue instead of indexer to avoid creating temporary objects
+            if (_serviceDictionary.TryGetValue(0, out var mainScope) && 
+                mainScope.TryGetValue(serviceType, out var dependencyObject))
             {
-                ConstructorInfo obj = null;
-                if (_objectGraph.Count > 0)
-                {
-                    #if UNITY_2022_1_OR_NEWER
-                    obj = _objectGraph[^1];
-                    #else
-                    obj = _objectGraph[_objectGraph.Count - 1];
-                    #endif
-                }
-
-                Errors.InvalidOperation(obj == null
-                    ? $"There is no such a service {serviceType} registered"
-                    : $"{obj.DeclaringType} tried to find {serviceType} but dependency is not found.");
+                return dependencyObject;
             }
-
-            return dependencyObject;
+            
+            Logs.InvalidOperation(_constructorInfo == null
+                ? $"There is no such a service {serviceType} registered"
+                : $"{_constructorInfo.DeclaringType} tried to find {serviceType} but dependency is not found.");
+            
+            return null;
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private bool TryToGetCachedImpl(DependencyObject dependencyObject, out DependencyObject value)
         {
             switch (dependencyObject.LifeTime)
             {
                 case ServiceLifeTime.Scoped:
                 {
-                    var scope = _serviceDictionary[_currentScopeID];
-                    if (scope.TryGetValue(dependencyObject.ServiceType, out var scopedDependencyObject))
+                    if (_serviceDictionary.TryGetValue(_currentScopeID, out var scope))
                     {
-                        if (scopedDependencyObject.Implementation != null)
+                        lock (_dictionaryLock)
                         {
-                            value = scopedDependencyObject;
-                            return true;
-                        }
-                    }
+                            if (scope.TryGetValue(dependencyObject.ServiceType, out var scopedDependencyObject))
+                            {
+                                if (scopedDependencyObject.Implementation != null)
+                                {
+                                    value = scopedDependencyObject;
+                                    return true;
+                                }
+                            }
 
-                    scopedDependencyObject = new DependencyObject(dependencyObject);
-                    scope[scopedDependencyObject.ServiceType] = scopedDependencyObject;
-                    value = scopedDependencyObject;
+                            scopedDependencyObject = new DependencyObject(dependencyObject);
+                            scope[scopedDependencyObject.ServiceType] = scopedDependencyObject;
+                            value = scopedDependencyObject;
+                        }
+                        return false;
+                    }
+                    
+                    // Если скоп не найден, создаем новый
+                    scope = new Dictionary<Type, DependencyObject>(32);
+                    _serviceDictionary[_currentScopeID] = scope;
+                    
+                    var newScopedDependencyObject = new DependencyObject(dependencyObject);
+                    scope[newScopedDependencyObject.ServiceType] = newScopedDependencyObject;
+                    value = newScopedDependencyObject;
                     return false;
                 }
                 case ServiceLifeTime.Singleton:
@@ -446,33 +658,33 @@ namespace MiniContainer
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void CheckCircularDependency()
         {
-            for (var i = 0; i < _objectGraph.Count; i++)
+            // Use HashSet for fast element check
+            var hashCode = _constructorInfo.GetHashCode();
+            if (_objectGraphHashCodes.Contains(hashCode))
             {
-                var c = _objectGraph[i];
-                if (c.GetHashCode() != _constructorInfo.GetHashCode())
-                {
-                    continue;
-                }
-                Errors.InvalidOperation($"{_constructorInfo.DeclaringType} has circular dependency!");
-                break;
+                Logs.InvalidOperation($"{_constructorInfo.DeclaringType} has circular dependency!");
             }
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private ConstructorInfo GetConstructorInfo(Type actualType)
         {
-            var ctors = actualType.GetConstructors();
+            if (!_constructorCache.TryGetValue(actualType, out var ctors))
+            {
+                ctors = actualType.GetConstructors();
+                _constructorCache[actualType] = ctors;
+            }
+            
             if (ctors.Length == 0)
             {
-                Errors.Log($"<color=yellow>{actualType} has no public constructors</color>");
+                Logs.Log($"<color=yellow>{actualType} has no public constructors</color>");
                 return null;
             }
             
             var first = ctors[0];
             
-            for (var i = 0; i < ctors.Length; i++)
+            foreach (var c in ctors)
             {
-                var c = ctors[i];
                 if (c.GetParameters().Length <= 0)
                 {
                     continue;
@@ -485,40 +697,48 @@ namespace MiniContainer
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private void TryToSetImplementationTypes(DependencyObject dependencyObject)
+        private void SetImplementationTypes(DependencyObject dependencyObject)
         {
             if (dependencyObject.LifeTime == ServiceLifeTime.Transient)
             {
                 return;
             }
 
-            for (var i = 0; i < dependencyObject.InterfaceTypes.Count; i++)
+            var interfaceTypes = dependencyObject.InterfaceTypes;
+            var count = interfaceTypes.Count;
+            for (var i = 0; i < count; i++)
             {
-                var serviceType = dependencyObject.InterfaceTypes[i];
+                var serviceType = interfaceTypes[i];
                 switch (dependencyObject.LifeTime)
                 {
                     case ServiceLifeTime.Singleton:
-                        ServiceDictionary[0][serviceType].Implementation ??= dependencyObject.Implementation;
+                        var mainScope = ServiceDictionary[0];
+                        if (mainScope.TryGetValue(serviceType, out var singletonDependencyObject))
+                        {
+                            singletonDependencyObject.Implementation ??= dependencyObject.Implementation;
+                        }
                         break;
                     case ServiceLifeTime.Scoped:
-                        if (!ServiceDictionary[_currentScopeID]
-                                .TryGetValue(serviceType, out var scopedDependencyObject))
+                        var currentScope = _serviceDictionary[_currentScopeID];
+                        lock (_dictionaryLock)
                         {
-                            dependencyObject.ServiceType = serviceType;
-                            scopedDependencyObject = new DependencyObject(dependencyObject);
-                            ServiceDictionary[_currentScopeID].TryAdd(serviceType, scopedDependencyObject);
+                            if (!currentScope.TryGetValue(serviceType, out var scopedDependencyObject))
+                            {
+                                dependencyObject.ServiceType = serviceType;
+                                scopedDependencyObject = new DependencyObject(dependencyObject);
+                                currentScope[serviceType] = scopedDependencyObject;
+                            }
                         }
-
                         break;
                 }
             }
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static void CheckInterfaces(DependencyObject dependencyObject)
+        private void CheckInterfaces(DependencyObject dependencyObject)
         {
-            dependencyObject.TryToSetDisposable();
-            dependencyObject.TryToSetListeners();
+            dependencyObject.SetDisposable();
+            dependencyObject.SetListeners(this);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -526,19 +746,19 @@ namespace MiniContainer
         {
             if (scopeID <= 0)
             {
-                Errors.Log("<color=yellow>You can't release the main scope</color>");
+                Logs.Log("<color=yellow>You can't release the main scope</color>");
                 return;
             }
 
             if (_serviceDictionary.TryGetValue(scopeID, out var scope))
             {
-                foreach (var scopedDependencyObject in scope)
+                foreach (var scopedDependencyObject in scope.Values)
                 {
-                    scopedDependencyObject.Value.Dispose();
+                    scopedDependencyObject.Dispose();
                 }
 
                 scope.Clear();
-                Errors.Log($"<color=green> Scope has been released with ID {scopeID}</color>");
+                Logs.Log($"<color=green> Scope has been released with ID {scopeID}</color>");
             }
 
             if (scopeID == _currentScopeID)
@@ -552,31 +772,36 @@ namespace MiniContainer
         {
             foreach (var scopes in ServiceDictionary)
             {
-                foreach (var scope in scopes.Value)
+                foreach (var scope in scopes.Value.Values)
                 {
-                    if (scope.Value.Implementation == null
-                        || scope.Value.Implementation is MonoBehaviour)
+                    if (scope.Implementation is null or MonoBehaviour)
                     {
                         continue;
                     }
 
-                    scope.Value.Dispose();
+                    scope.Dispose();
                 }
             }
 
             ServiceDictionary.Clear();
-            _objectGraph.Clear();
+            
+            // Очистка пула объектов
+            if (_enablePooling)
+            {
+                lock (_dictionaryLock)
+                {
+                    _objectPool.Clear();
+                }
+            }
         }
         
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Release(Type type)
         {
-            if (ServiceDictionary.Count == 0)
-            {
-                return;
-            }
+            if (ServiceDictionary == null || ServiceDictionary.Count == 0) return;
             
-            if (!ServiceDictionary[0].TryGetValue(type, out var value))
+            var mainScope = ServiceDictionary[0];
+            if (!mainScope.TryGetValue(type, out var value))
             {
                 return;
             }
@@ -585,27 +810,60 @@ namespace MiniContainer
                 return;
             }
 
+            // Release the object and its dependencies
             ReleaseObject(value);
-            ServiceDictionary[0].TryRemove(type, out _);
+            
+            // Remove from dictionary
+            lock (_dictionaryLock)
+            {
+                mainScope.Remove(type);
+            }
+            
+            // Force garbage collection to free memory
+            GC.Collect();
+            GC.WaitForPendingFinalizers();
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void ReleaseObject(DependencyObject dependencyObject)
         {
-            foreach (var service in ServiceDictionary[0])
+            // Clear all references to the object in other services
+            var mainScope = ServiceDictionary[0];
+            foreach (var service in mainScope.Values)
             {
-                if (service.Value.Implementation == null)
+                if (service.Implementation == null)
                 {
                     continue;
                 }
 
-                var fields = service.Value.Implementation.GetType()
-                    .GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+                // Clear fields
+                var type = service.Implementation.GetType();
+                if (!_fieldCache.TryGetValue(type, out var fields))
+                {
+                    fields = type.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+                    _fieldCache[type] = fields;
+                }
+                
                 foreach (var field in fields)
                 {
                     if (field.FieldType == dependencyObject.ServiceType)
                     {
-                        field.SetValue(service.Value.Implementation, null);
+                        field.SetValue(service.Implementation, null);
+                    }
+                }
+                
+                // Clear properties
+                if (!_propertyCache.TryGetValue(type, out var properties))
+                {
+                    properties = type.GetProperties(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+                    _propertyCache[type] = properties;
+                }
+                
+                foreach (var property in properties)
+                {
+                    if (property.PropertyType == dependencyObject.ServiceType && property.CanWrite)
+                    {
+                        property.SetValue(service.Implementation, null);
                     }
                 }
             }
@@ -616,59 +874,71 @@ namespace MiniContainer
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void RunUpdate()
         {
-            foreach (var scopes in ServiceDictionary)
-            {
-                foreach (var scope in scopes.Value)
-                {
-                    scope.Value.Listeners.ContainerUpdate?.Update();
-                }
-            }
+            OnContainerUpdate?.Invoke();
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void RunSceneLoaded(int scene)
         {
-            foreach (var scopes in ServiceDictionary)
-            {
-                foreach (var scope in scopes.Value)
-                {
-                    scope.Value.Listeners.ContainerSceneLoaded?.OnSceneLoaded(scene);
-                }
-            }
+           OnContainerSceneLoaded?.Invoke(scene);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void RunSceneUnloaded(int scene)
         {
-            foreach (var scopes in ServiceDictionary)
-            {
-                foreach (var scope in scopes.Value)
-                {
-                    scope.Value.Listeners.ContainerSceneUnloaded?.OnSceneUnloaded(scene);
-                }
-            }
+            OnContainerSceneUnloaded?.Invoke(scene);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void RunApplicationFocus(bool focus)
         {
-            foreach (var scopes in ServiceDictionary)
-            {
-                foreach (var scope in scopes.Value)
-                {
-                    scope.Value.Listeners.ContainerApplicationFocus?.OnApplicationFocus(focus);
-                }
-            }
+            OnContainerApplicationFocus?.Invoke(focus);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void RunApplicationPause(bool pause)
         {
-            foreach (var scopes in ServiceDictionary)
+            OnContainerApplicationPause?.Invoke(pause);
+        }
+        
+        // Новые методы для работы с пулом объектов
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private bool TryGetFromPool(Type type, out object instance)
+        {
+            instance = null;
+            
+            if (!_enablePooling)
+                return false;
+                
+            lock (_dictionaryLock)
             {
-                foreach (var scope in scopes.Value)
+                if (_objectPool.TryGetValue(type, out var stack) && stack.Count > 0)
                 {
-                    scope.Value.Listeners.ContainerApplicationPause?.OnApplicationPause(pause);
+                    instance = stack.Pop();
+                    return true;
+                }
+            }
+            
+            return false;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private void ReturnToPool(Type type, object instance)
+        {
+            if (!_enablePooling)
+                return;
+                
+            lock (_dictionaryLock)
+            {
+                if (!_objectPool.TryGetValue(type, out var stack))
+                {
+                    stack = new Stack<object>(MaxPoolSize);
+                    _objectPool[type] = stack;
+                }
+                
+                if (stack.Count < MaxPoolSize)
+                {
+                    stack.Push(instance);
                 }
             }
         }

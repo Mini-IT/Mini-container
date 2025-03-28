@@ -1,46 +1,63 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 
 namespace MiniContainer
 {
     public class DependencyObject : IDisposable
     {
+        internal readonly Type ImplementationType;
+        internal readonly List<Type> InterfaceTypes;
+        internal readonly ServiceLifeTime LifeTime;
+        
+        private readonly Listeners _listeners;
+        
+        private readonly Func<object> _getImplementation;
+        
         internal Type ServiceType { get; set; }
-
-        internal Type ImplementationType { get; }
-        
-        internal List<Type> InterfaceTypes { get; }
-
         internal object Implementation { get; set; }
-        
-        internal ServiceLifeTime LifeTime { get; }
-        
-        internal Listeners Listeners { get; }
-        
+
         private IDisposable _disposable;
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal DependencyObject(Type serviceType, Type implementationType, object implementation,
-            ServiceLifeTime lifeTime, List<Type> interfaceTypes)
+            ServiceLifeTime lifeTime, List<Type> interfaceTypes, Func<object> getImplementation = null)
         {
-            Listeners = new Listeners();
+            _listeners = new Listeners();
             ServiceType = serviceType;
             LifeTime = lifeTime;
             ImplementationType = implementationType;
             Implementation = implementation;
             InterfaceTypes = interfaceTypes;
+            _getImplementation = getImplementation;
         }
         
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal DependencyObject(DependencyObject dependencyObject)
         {
-            Listeners = new Listeners();
+            _listeners = new Listeners();
             ServiceType = dependencyObject.ServiceType;
             LifeTime = dependencyObject.LifeTime;
             ImplementationType = dependencyObject.ImplementationType;
             Implementation = dependencyObject.Implementation;
             InterfaceTypes = dependencyObject.InterfaceTypes;
+            _getImplementation = dependencyObject._getImplementation;
         }
 
-        public void TryToSetDisposable()
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool TryGetImplementation(out object implementation)
+        {
+            if (_getImplementation != null)
+            {
+                implementation = _getImplementation();
+                return true;
+            }
+            implementation = null;
+            return false;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void SetDisposable()
         {
             if (Implementation is IDisposable disposable)
             {
@@ -48,39 +65,28 @@ namespace MiniContainer
             }
         }
 
-        public void TryToSetListeners()
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void SetListeners(IContainerListener containerListener)
         {
-            if (Implementation is IContainerSceneLoadedListener containerSceneLoaded)
-            {
-                Listeners.ContainerSceneLoaded = containerSceneLoaded;
-            }
-            
-            if (Implementation is IContainerUpdateListener containerUpdate)
-            {
-                Listeners.ContainerUpdate = containerUpdate;
-            }
-            
-            if (Implementation is IContainerSceneUnloadedListener containerSceneUnloaded)
-            {
-                Listeners.ContainerSceneUnloaded = containerSceneUnloaded;
-            }
-
-            if (Implementation is IContainerApplicationFocusListener containerApplicationFocus)
-            {
-                Listeners.ContainerApplicationFocus = containerApplicationFocus;
-            }
-
-            if (Implementation is IContainerApplicationPauseListener containerApplicationPause)
-            {
-                Listeners.ContainerApplicationPause = containerApplicationPause;
-            }
+            _listeners.SetListeners(containerListener, Implementation);
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Dispose()
-        {
-            Implementation = null;
+        {            
             _disposable?.Dispose();
-            Listeners.Dispose();
+            _disposable = null;
+            
+            _listeners.Dispose();
+            
+            Implementation = null;
+
+            if (InterfaceTypes != null && InterfaceTypes.Count > 0)
+            {
+                InterfaceTypes.Clear();
+            }
+            
+            GC.Collect(0, GCCollectionMode.Optimized);
         }
     }
 }
