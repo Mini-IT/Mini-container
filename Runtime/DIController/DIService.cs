@@ -9,11 +9,6 @@ namespace MiniContainer
         private readonly List<IRegistration> _registrations = new List<IRegistration>();
         private readonly List<Type> _ignoreTypeList = new List<Type>()
         {
-            typeof(IContainerUpdateListener),
-            typeof(IContainerSceneLoadedListener),
-            typeof(IContainerSceneUnloadedListener),
-            typeof(IContainerApplicationFocusListener),
-            typeof(IContainerApplicationPauseListener),
             typeof(IDisposable)
         };
         
@@ -30,11 +25,11 @@ namespace MiniContainer
             _ignoreTypeList.Add(type);
         }
 
-        public DIContainer GenerateContainer(bool enablePooling = true, 
-            bool enableParallelInitialization = true)
+        public DIContainer GenerateContainer(bool enableParallelInitialization = true)
         {
-            var container = new DIContainer(_registrations, _ignoreTypeList, enablePooling, enableParallelInitialization);
+            var container = new DIContainer(_registrations, _ignoreTypeList, enableParallelInitialization);
             this.RegisterInstance(new ScopeManager(container)).AsImplementedInterfaces();
+            this.RegisterInstance<IContainerLifeCycle>(container);
             return container;
         }
     }
