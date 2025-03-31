@@ -8,7 +8,7 @@ using UnityEngine;
 
 namespace MiniContainer
 {
-    public class DIContainer : IContainer, IContainerListener
+    public class DIContainer : IContainer, IContainerLifeCycle
     {
         // Maximum pool size for each type
         private const int MaxPoolSize = 32;
@@ -23,10 +23,6 @@ namespace MiniContainer
         private readonly Dictionary<Type, PropertyInfo[]> _propertyCache;
         private readonly Dictionary<Type, MethodInfo[]> _methodCache;
         private readonly Dictionary<Type, ConstructorInfo[]> _constructorCache;
-        // Object pool for Transient dependencies
-        private readonly Dictionary<Type, Stack<object>> _objectPool;
-        // Flag to enable/disable pooling
-        private readonly bool _enablePooling;
         // Flag to enable/disable parallel initialization
         private readonly bool _enableParallelInitialization;
         private ConstructorInfo _constructorInfo;
@@ -48,8 +44,7 @@ namespace MiniContainer
 
         private int _currentScopeID = -1;
   
-        public DIContainer(List<IRegistration> registrations, List<Type> ignoreTypeList, bool enablePooling = true, 
-            bool enableParallelInitialization = true)
+        public DIContainer(List<IRegistration> registrations, List<Type> ignoreTypeList, bool enableParallelInitialization = true)
         {
             _serviceDictionary = new ConcurrentDictionary<int, Dictionary<Type, DependencyObject>>();
             _fieldCache = new Dictionary<Type, FieldInfo[]>(128);
@@ -59,8 +54,6 @@ namespace MiniContainer
             _objectGraphHashCodes = new HashSet<int>(16);
             _ignoreTypeList = ignoreTypeList;
             _registrations = registrations;
-            _objectPool = new Dictionary<Type, Stack<object>>(64);
-            _enablePooling = enablePooling;
             _enableParallelInitialization = enableParallelInitialization;
             CreateScope();
         }
@@ -108,7 +101,7 @@ namespace MiniContainer
             }
             
             // Pre-calculate total interfaces count for more accurate memory allocation
-            int totalInterfaces = 0;
+            var totalInterfaces = 0;
             foreach (var registration in _registrations)
             {
                 totalInterfaces += registration.InterfaceTypes.Count;
@@ -342,13 +335,7 @@ namespace MiniContainer
 
             if (dependencyObject.LifeTime == ServiceLifeTime.Transient)
             {
-                // If object is Transient, return it to pool instead of destroying
-                if (_enablePooling && !(impl is IDisposable) && !(impl is UnityEngine.Object))
-                {
-                    ReturnToPool(serviceType, impl);
-                }
                 dependencyObject.Implementation = null;
-                dependencyObject.Dispose();
             }
 
             return impl;
@@ -524,12 +511,6 @@ namespace MiniContainer
                 {
                     dependencyObject.Implementation = implementation;
                 }
-                else if (_enablePooling && dependencyObject.LifeTime == ServiceLifeTime.Transient && 
-                         TryGetFromPool(dependencyObject.ImplementationType, out var pooledObject))
-                {
-                    // Get object from pool if available
-                    dependencyObject.Implementation = pooledObject;
-                }
                 else
                 {
                     var actualType = dependencyObject.ImplementationType;
@@ -557,7 +538,7 @@ namespace MiniContainer
                 }
                 
                 ResolveObject(dependencyObject.Implementation);
-                CheckInterfaces(dependencyObject);
+                CheckDisposableInterface(dependencyObject);
                 SetImplementationTypes(dependencyObject);
                 Initialize(dependencyObject);
             }
@@ -578,7 +559,6 @@ namespace MiniContainer
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private DependencyObject TryGetDependencyObject(Type serviceType)
         {
-            // Use TryGetValue instead of indexer to avoid creating temporary objects
             if (_serviceDictionary.TryGetValue(0, out var mainScope) && 
                 mainScope.TryGetValue(serviceType, out var dependencyObject))
             {
@@ -735,10 +715,14 @@ namespace MiniContainer
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private void CheckInterfaces(DependencyObject dependencyObject)
+        private void CheckDisposableInterface(DependencyObject dependencyObject)
         {
+            if (dependencyObject.LifeTime == ServiceLifeTime.Transient)
+            {
+                return;
+            }
+            
             dependencyObject.SetDisposable();
-            dependencyObject.SetListeners(this);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -774,7 +758,7 @@ namespace MiniContainer
             {
                 foreach (var scope in scopes.Value.Values)
                 {
-                    if (scope.Implementation is null or MonoBehaviour)
+                    if (scope.Implementation is null or UnityEngine.Object)
                     {
                         continue;
                     }
@@ -784,15 +768,6 @@ namespace MiniContainer
             }
 
             ServiceDictionary.Clear();
-            
-            // Очистка пула объектов
-            if (_enablePooling)
-            {
-                lock (_dictionaryLock)
-                {
-                    _objectPool.Clear();
-                }
-            }
         }
         
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -805,72 +780,20 @@ namespace MiniContainer
             {
                 return;
             }
+            
             if (value.Implementation == null)
             {
                 return;
             }
-
-            // Release the object and its dependencies
-            ReleaseObject(value);
             
-            // Remove from dictionary
+            value.Dispose();
+            
             lock (_dictionaryLock)
             {
                 mainScope.Remove(type);
             }
-            
-            // Force garbage collection to free memory
-            GC.Collect();
-            GC.WaitForPendingFinalizers();
         }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private void ReleaseObject(DependencyObject dependencyObject)
-        {
-            // Clear all references to the object in other services
-            var mainScope = ServiceDictionary[0];
-            foreach (var service in mainScope.Values)
-            {
-                if (service.Implementation == null)
-                {
-                    continue;
-                }
-
-                // Clear fields
-                var type = service.Implementation.GetType();
-                if (!_fieldCache.TryGetValue(type, out var fields))
-                {
-                    fields = type.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
-                    _fieldCache[type] = fields;
-                }
-                
-                foreach (var field in fields)
-                {
-                    if (field.FieldType == dependencyObject.ServiceType)
-                    {
-                        field.SetValue(service.Implementation, null);
-                    }
-                }
-                
-                // Clear properties
-                if (!_propertyCache.TryGetValue(type, out var properties))
-                {
-                    properties = type.GetProperties(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
-                    _propertyCache[type] = properties;
-                }
-                
-                foreach (var property in properties)
-                {
-                    if (property.PropertyType == dependencyObject.ServiceType && property.CanWrite)
-                    {
-                        property.SetValue(service.Implementation, null);
-                    }
-                }
-            }
-
-            dependencyObject.Dispose();
-        }
-
+        
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void RunUpdate()
         {
@@ -899,48 +822,6 @@ namespace MiniContainer
         public void RunApplicationPause(bool pause)
         {
             OnContainerApplicationPause?.Invoke(pause);
-        }
-        
-        // Новые методы для работы с пулом объектов
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private bool TryGetFromPool(Type type, out object instance)
-        {
-            instance = null;
-            
-            if (!_enablePooling)
-                return false;
-                
-            lock (_dictionaryLock)
-            {
-                if (_objectPool.TryGetValue(type, out var stack) && stack.Count > 0)
-                {
-                    instance = stack.Pop();
-                    return true;
-                }
-            }
-            
-            return false;
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private void ReturnToPool(Type type, object instance)
-        {
-            if (!_enablePooling)
-                return;
-                
-            lock (_dictionaryLock)
-            {
-                if (!_objectPool.TryGetValue(type, out var stack))
-                {
-                    stack = new Stack<object>(MaxPoolSize);
-                    _objectPool[type] = stack;
-                }
-                
-                if (stack.Count < MaxPoolSize)
-                {
-                    stack.Push(instance);
-                }
-            }
         }
     }
 }

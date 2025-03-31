@@ -322,47 +322,80 @@ public class LevelManager : IContainerSceneLoadedListener
 
 ## Жизненный цикл
 
-MiniContainer предоставляет несколько интерфейсов для реакции на события жизненного цикла Unity:
+MiniContainer предоставляет два основных интерфейса для управления жизненным циклом:
+
+### IContainerInitializable
+
+Используется для инициализации объекта после его создания и внедрения всех зависимостей:
 
 ```csharp
-// Обновление каждый кадр
-public class GameUpdater : IContainerUpdateListener
+public class ConfigService : IContainerInitializable
 {
-    public void OnUpdate()
+    public void Initialize()
     {
-        // Код, выполняемый каждый кадр
+        // Код, выполняемый однократно после создания и внедрения зависимостей
+        Debug.Log("Config service initialized");
     }
 }
+```
 
-// Реакция на изменение фокуса приложения
-public class FocusHandler : IContainerApplicationFocusListener
+### IContainerLifeCycle
+
+Центральный интерфейс для подписки на события жизненного цикла контейнера. Клиент сам отвечает за подписку и отписку от событий:
+
+```csharp
+public class GameManager
 {
-    public void OnApplicationFocus(bool hasFocus)
+    private readonly IContainerLifeCycle _containerLifeCycle;
+    
+    public GameManager(IContainerLifeCycle containerLifeCycle)
     {
-        if (hasFocus)
-        {
-            // Приложение получило фокус
-        }
-        else
-        {
-            // Приложение потеряло фокус
-        }
+        _containerLifeCycle = containerLifeCycle;
     }
-}
 
-// Реакция на паузу приложения
-public class PauseHandler : IContainerApplicationPauseListener
-{
-    public void OnApplicationPause(bool isPaused)
+    public void Init()
     {
-        if (isPaused)
-        {
-            // Приложение поставлено на паузу
-        }
-        else
-        {
-            // Приложение снято с паузы
-        }
+        // Подписка на события
+        _containerLifeCycle.OnContainerUpdate += HandleUpdate;
+        _containerLifeCycle.OnContainerSceneLoaded += HandleSceneLoaded;
+        _containerLifeCycle.OnContainerSceneUnloaded += HandleSceneUnloaded;
+        _containerLifeCycle.OnContainerApplicationFocus += HandleApplicationFocus;
+        _containerLifeCycle.OnContainerApplicationPause += HandleApplicationPause;
+    }
+    
+    private void HandleUpdate()
+    {
+        // Выполняется каждый кадр
+    }
+    
+    private void HandleSceneLoaded(int sceneIndex)
+    {
+        Debug.Log($"Сцена {sceneIndex} загружена");
+    }
+    
+    private void HandleSceneUnloaded(int sceneIndex)
+    {
+        Debug.Log($"Сцена {sceneIndex} выгружена");
+    }
+    
+    private void HandleApplicationFocus(bool hasFocus)
+    {
+        Debug.Log($"Приложение {(hasFocus ? "получило" : "потеряло")} фокус");
+    }
+    
+    private void HandleApplicationPause(bool isPaused)
+    {
+        Debug.Log($"Приложение {(isPaused ? "на паузе" : "возобновлено")}");
+    }
+    
+    public void Dispose()
+    {
+        // Важно! Не забывайте отписываться от событий
+        _containerLifeCycle.OnContainerUpdate -= HandleUpdate;
+        _containerLifeCycle.OnContainerSceneLoaded -= HandleSceneLoaded;
+        _containerLifeCycle.OnContainerSceneUnloaded -= HandleSceneUnloaded;
+        _containerLifeCycle.OnContainerApplicationFocus -= HandleApplicationFocus;
+        _containerLifeCycle.OnContainerApplicationPause -= HandleApplicationPause;
     }
 }
 ```
@@ -452,9 +485,6 @@ builder.IgnoreType<ILogger>();
 ### Настройка контейнера
 
 ```csharp
-// Создание контейнера с отключенным пулингом объектов
-var container = diService.GenerateContainer(enablePooling: false);
-
 // Создание контейнера с отключенной параллельной инициализацией
 var container = diService.GenerateContainer(enableParallelInitialization: false);
 ```
