@@ -2,7 +2,7 @@ using System;
 
 namespace MiniContainer
 {
-    public interface IContainerListener
+    public interface IContainerLifeCycle
     {
         event Action OnContainerUpdate;
         event Action<int> OnContainerSceneLoaded;
