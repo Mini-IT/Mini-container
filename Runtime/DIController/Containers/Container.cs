@@ -39,20 +39,20 @@ namespace MiniContainer
 
         private void RegisterGameObject(IBaseDIService builder, GameObject go)
         {
-            var buffer = ObjectListBuffer<MonoBehaviour>.Get();
-
             if (go == null)
             {
                 return;
             }
 
-            buffer.Clear();
+            using var bufferScope = ObjectListBuffer<MonoBehaviour>.GetScoped(out var buffer);
             go.GetComponents(buffer);
-            foreach (var monoBehaviour in buffer)
+            
+            for (var i = 0; i < buffer.Count; i++)
             {
+                var monoBehaviour = buffer[i];
                 if (monoBehaviour is IRegistrable registrable)
                 {
-                    DoRegister(builder,registrable);
+                    DoRegister(builder, registrable);
                 }
             }
         }
@@ -81,17 +81,17 @@ namespace MiniContainer
 
         private void ResolveGameObject(GameObject go)
         {
-            var buffer = ObjectListBuffer<MonoBehaviour>.Get();
-
             if (go == null)
             {
                 return;
             }
 
-            buffer.Clear();
+            using var bufferScope = ObjectListBuffer<MonoBehaviour>.GetScoped(out var buffer);
             go.GetComponents(buffer);
-            foreach (var monoBehaviour in buffer)
+            
+            for (var i = 0; i < buffer.Count; i++)
             {
+                var monoBehaviour = buffer[i];
                 DIContainer.ResolveObject(monoBehaviour);
             }
         }

@@ -66,7 +66,6 @@ namespace MiniContainer
         {            
             _disposable?.Dispose();
             _disposable = null;
-            
             Implementation = null;
 
             if (InterfaceTypes != null && InterfaceTypes.Count > 0)
