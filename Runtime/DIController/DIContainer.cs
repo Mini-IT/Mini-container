@@ -10,20 +10,15 @@ namespace MiniContainer
 {
     public class DIContainer : IContainer, IContainerLifeCycle
     {
-        // Maximum pool size for each type
-        private const int MaxPoolSize = 32;
-        
         private readonly List<Type> _ignoreTypeList;
         private readonly HashSet<int> _objectGraphHashCodes;
         private readonly List<IRegistration> _registrations;
         private readonly ConcurrentDictionary<int, Dictionary<Type, DependencyObject>> _serviceDictionary;
         private readonly object _dictionaryLock = new object();
-        // Cache for reflection
-        private readonly Dictionary<Type, FieldInfo[]> _fieldCache;
-        private readonly Dictionary<Type, PropertyInfo[]> _propertyCache;
-        private readonly Dictionary<Type, MethodInfo[]> _methodCache;
-        private readonly Dictionary<Type, ConstructorInfo[]> _constructorCache;
-        // Flag to enable/disable parallel initialization
+        private readonly ConcurrentDictionary<Type, FieldInfo[]> _fieldCache;
+        private readonly ConcurrentDictionary<Type, PropertyInfo[]> _propertyCache;
+        private readonly ConcurrentDictionary<Type, MethodInfo[]> _methodCache;
+        private readonly ConcurrentDictionary<Type, ConstructorInfo[]> _constructorCache;
         private readonly bool _enableParallelInitialization;
         private ConstructorInfo _constructorInfo;
 
@@ -47,10 +42,10 @@ namespace MiniContainer
         public DIContainer(List<IRegistration> registrations, List<Type> ignoreTypeList, bool enableParallelInitialization = true)
         {
             _serviceDictionary = new ConcurrentDictionary<int, Dictionary<Type, DependencyObject>>();
-            _fieldCache = new Dictionary<Type, FieldInfo[]>(128);
-            _propertyCache = new Dictionary<Type, PropertyInfo[]>(128);
-            _methodCache = new Dictionary<Type, MethodInfo[]>(128);
-            _constructorCache = new Dictionary<Type, ConstructorInfo[]>(128);
+            _fieldCache = new ConcurrentDictionary<Type, FieldInfo[]>(4, 128);
+            _propertyCache = new ConcurrentDictionary<Type, PropertyInfo[]>(4, 128);
+            _methodCache = new ConcurrentDictionary<Type, MethodInfo[]>(4, 128);
+            _constructorCache = new ConcurrentDictionary<Type, ConstructorInfo[]>(4, 128);
             _objectGraphHashCodes = new HashSet<int>(16);
             _ignoreTypeList = ignoreTypeList;
             _registrations = registrations;
@@ -79,7 +74,6 @@ namespace MiniContainer
         public int CreateScope()
         {
             _currentScopeID++;
-            // Pre-allocate memory for dictionary
             var newScope = new Dictionary<Type, DependencyObject>(32);
             _serviceDictionary[_currentScopeID] = newScope;
             Logs.Log($"<color=green> New scope has been created with ID: {_currentScopeID}</color>");
@@ -95,20 +89,23 @@ namespace MiniContainer
             
             if (!_serviceDictionary.TryGetValue(0, out var mainScope))
             {
-                // Pre-allocate memory for dictionary
-                mainScope = new Dictionary<Type, DependencyObject>(_registrations.Count * 2);
+                var estimatedCapacity = _registrations.Count * 3;
+                mainScope = new Dictionary<Type, DependencyObject>(estimatedCapacity);
                 _serviceDictionary[0] = mainScope;
             }
             
-            // Pre-calculate total interfaces count for more accurate memory allocation
             var totalInterfaces = 0;
-            foreach (var registration in _registrations)
+            for (var i = 0; i < _registrations.Count; i++)
             {
+                var registration = _registrations[i];
                 totalInterfaces += registration.InterfaceTypes.Count;
             }
             
-            // Allocate memory with some extra space
-            mainScope.EnsureCapacity(Math.Max(totalInterfaces, _registrations.Count * 2));
+            var targetCapacity = Math.Max(totalInterfaces, mainScope.Count + _registrations.Count * 2);
+            if (mainScope.Count < targetCapacity)
+            {
+                mainScope.EnsureCapacity(targetCapacity);
+            }
             
             for (var i = 0; i < _registrations.Count; i++)
             {
@@ -213,7 +210,6 @@ namespace MiniContainer
                 return;
             }
             
-            // Собираем все объекты, которые нужно инициализировать
             var instanceObjects = new List<object>();
             foreach (var dependencyObject in mainScope.Values)
             {
@@ -223,104 +219,13 @@ namespace MiniContainer
                 }
             }
             
-            // Параллельно инициализируем объекты
             if (instanceObjects.Count > 0)
             {
-                Parallel.ForEach(instanceObjects, implementation =>
-                {
-                    // Для каждого объекта создаем локальные кэши, чтобы избежать блокировок
-                    var localFieldCache = new Dictionary<Type, FieldInfo[]>();
-                    var localPropertyCache = new Dictionary<Type, PropertyInfo[]>();
-                    var localMethodCache = new Dictionary<Type, MethodInfo[]>();
-                    
-                    ResolveFieldParallel(implementation, localFieldCache);
-                    ResolvePropertyParallel(implementation, localPropertyCache);
-                    ResolveMethodParallel(implementation, localMethodCache);
-                });
+                Parallel.ForEach(instanceObjects, ResolveObject);
             }
         }
         
-        // Параллельные версии методов разрешения зависимостей
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private void ResolveFieldParallel(object implementation, Dictionary<Type, FieldInfo[]> localFieldCache)
-        {
-            var type = implementation.GetType();
-            if (!localFieldCache.TryGetValue(type, out var fields))
-            {
-                fields = type.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
-                localFieldCache[type] = fields;
-            }
 
-            foreach (var field in fields)
-            {
-                var attr = field.GetCustomAttribute(typeof(ResolveAttribute));
-
-                if (attr == null)
-                {
-                    continue;
-                }
-
-                var fieldImpl = ResolveType(field.FieldType).Implementation;
-                
-                // Use cached setter or create a new one
-                var setter = Activator.GetFieldSetter(field);
-                setter(implementation, fieldImpl);
-            }
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private void ResolvePropertyParallel(object implementation, Dictionary<Type, PropertyInfo[]> localPropertyCache)
-        {
-            var type = implementation.GetType();
-            if (!localPropertyCache.TryGetValue(type, out var properties))
-            {
-                properties = type.GetProperties(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
-                localPropertyCache[type] = properties;
-            }
-
-            foreach (var property in properties)
-            {
-                var attr = property.GetCustomAttribute(typeof(ResolveAttribute));
-
-                if (attr == null)
-                {
-                    continue;
-                }
-
-                var propertyImpl = ResolveType(property.PropertyType).Implementation;
-                
-                // Use cached setter or create a new one
-                var setter = Activator.GetPropertySetter(property);
-                setter(implementation, propertyImpl);
-            }
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private void ResolveMethodParallel(object implementation, Dictionary<Type, MethodInfo[]> localMethodCache)
-        {
-            var type = implementation.GetType();
-            if (!localMethodCache.TryGetValue(type, out var methods))
-            {
-                methods = type.GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
-                localMethodCache[type] = methods;
-            }
-
-            foreach (var method in methods)
-            {
-                var attr = method.GetCustomAttribute(typeof(ResolveAttribute));
-
-                if (attr == null)
-                {
-                    continue;
-                }
-
-                var parameters = SelectParameters(method.GetParameters());
-                
-                // Use cached invoker or create a new one
-                var invoker = Activator.GetMethodInvoker(method);
-                invoker(implementation, parameters);
-            }
-        }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public object Resolve(Type serviceType)
@@ -413,11 +318,8 @@ namespace MiniContainer
         private void ResolveProperty(object implementation)
         {
             var type = implementation.GetType();
-            if (!_propertyCache.TryGetValue(type, out var properties))
-            {
-                properties = type.GetProperties(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
-                _propertyCache[type] = properties;
-            }
+            var properties = _propertyCache.GetOrAdd(type, t => 
+                t.GetProperties(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance));
 
             foreach (var property in properties)
             {
@@ -429,8 +331,6 @@ namespace MiniContainer
                 }
 
                 var propertyImpl = ResolveType(property.PropertyType).Implementation;
-                
-                // Use cached setter or create a new one
                 var setter = Activator.GetPropertySetter(property);
                 setter(implementation, propertyImpl);
             }
@@ -440,11 +340,8 @@ namespace MiniContainer
         private void ResolveField(object implementation)
         {
             var type = implementation.GetType();
-            if (!_fieldCache.TryGetValue(type, out var fields))
-            {
-                fields = type.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
-                _fieldCache[type] = fields;
-            }
+            var fields = _fieldCache.GetOrAdd(type, t => 
+                t.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance));
 
             foreach (var field in fields)
             {
@@ -456,8 +353,6 @@ namespace MiniContainer
                 }
 
                 var fieldImpl = ResolveType(field.FieldType).Implementation;
-                
-                // Use cached setter or create a new one
                 var setter = Activator.GetFieldSetter(field);
                 setter(implementation, fieldImpl);
             }
@@ -467,11 +362,8 @@ namespace MiniContainer
         private void ResolveMethod(object implementation)
         {
             var type = implementation.GetType();
-            if (!_methodCache.TryGetValue(type, out var methods))
-            {
-                methods = type.GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
-                _methodCache[type] = methods;
-            }
+            var methods = _methodCache.GetOrAdd(type, t => 
+                t.GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance));
 
             foreach (var method in methods)
             {
@@ -483,8 +375,6 @@ namespace MiniContainer
                 }
 
                 var parameters = SelectParameters(method.GetParameters());
-                
-                // Use cached invoker or create a new one
                 var invoker = Activator.GetMethodInvoker(method);
                 invoker(implementation, parameters);
             }
@@ -599,7 +489,6 @@ namespace MiniContainer
                         return false;
                     }
                     
-                    // Если скоп не найден, создаем новый
                     scope = new Dictionary<Type, DependencyObject>(32);
                     _serviceDictionary[_currentScopeID] = scope;
                     
@@ -638,7 +527,6 @@ namespace MiniContainer
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void CheckCircularDependency()
         {
-            // Use HashSet for fast element check
             var hashCode = _constructorInfo.GetHashCode();
             if (_objectGraphHashCodes.Contains(hashCode))
             {
@@ -649,11 +537,7 @@ namespace MiniContainer
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private ConstructorInfo GetConstructorInfo(Type actualType)
         {
-            if (!_constructorCache.TryGetValue(actualType, out var ctors))
-            {
-                ctors = actualType.GetConstructors();
-                _constructorCache[actualType] = ctors;
-            }
+            var ctors = _constructorCache.GetOrAdd(actualType, type => type.GetConstructors());
             
             if (ctors.Length == 0)
             {
@@ -661,19 +545,19 @@ namespace MiniContainer
                 return null;
             }
             
-            var first = ctors[0];
+            var bestConstructor = ctors[0];
             
-            foreach (var c in ctors)
+            for (var i = 0; i < ctors.Length; i++)
             {
-                if (c.GetParameters().Length <= 0)
+                var constructor = ctors[i];
+                if (constructor.GetParameters().Length > 0)
                 {
-                    continue;
+                    bestConstructor = constructor;
+                    break;
                 }
-                first = c;
-                break;
             }
 
-            return first;
+            return bestConstructor;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
