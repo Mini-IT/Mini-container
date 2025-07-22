@@ -25,8 +25,14 @@ namespace MiniContainer
             _ignoreTypeList.Add(type);
         }
 
-        public DIContainer GenerateContainer(bool enableParallelInitialization = true)
+        public DIContainer GenerateContainer()
         {
+            var enableParallelInitialization = true;
+
+            #if UNITY_WEBGL && !UNITY_EDITOR
+            enableParallelInitialization = false;
+            #endif
+            
             var container = new DIContainer(_registrations, _ignoreTypeList, enableParallelInitialization);
             this.RegisterInstance(new ScopeManager(container)).AsImplementedInterfaces();
             this.RegisterInstance<IContainerLifeCycle>(container);
