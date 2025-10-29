@@ -7,11 +7,12 @@ namespace MiniContainer
     public class DIService : IDIService
     {
         private readonly List<IRegistration> _registrations = new List<IRegistration>();
+
         private readonly List<Type> _ignoreTypeList = new List<Type>()
         {
             typeof(IDisposable)
         };
-        
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public T Register<T>(T registration) where T : IRegistration
         {
@@ -27,13 +28,7 @@ namespace MiniContainer
 
         public DIContainer GenerateContainer()
         {
-            var enableParallelInitialization = true;
-
-            #if UNITY_WEBGL && !UNITY_EDITOR
-            enableParallelInitialization = false;
-            #endif
-            
-            var container = new DIContainer(_registrations, _ignoreTypeList, enableParallelInitialization);
+            var container = new DIContainer(_registrations, _ignoreTypeList);
             this.RegisterInstance(new ScopeManager(container)).AsImplementedInterfaces();
             this.RegisterInstance<IContainerLifeCycle>(container);
             return container;

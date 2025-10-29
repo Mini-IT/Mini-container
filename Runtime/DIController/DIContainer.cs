@@ -3,7 +3,6 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Reflection;
 using System.Runtime.CompilerServices;
-using System.Threading.Tasks;
 using UnityEngine;
 
 namespace MiniContainer
@@ -20,7 +19,6 @@ namespace MiniContainer
         private readonly ConcurrentDictionary<Type, MethodInfo[]> _methodCache;
         private readonly ConcurrentDictionary<Type, ConstructorInfo[]> _constructorCache;
         private readonly object _dictionaryLock = new object();
-        private readonly bool _enableParallelInitialization;
         private ConstructorInfo _constructorInfo;
 
         public event Action OnContainerUpdate;
@@ -40,7 +38,7 @@ namespace MiniContainer
 
         private int _currentScopeID = -1;
   
-        public DIContainer(List<IRegistration> registrations, List<Type> ignoreTypeList, bool enableParallelInitialization = true)
+        public DIContainer(List<IRegistration> registrations, List<Type> ignoreTypeList)
         {
             _serviceDictionary = new ConcurrentDictionary<int, Dictionary<Type, DependencyObject>>();
             _fieldCache = new ConcurrentDictionary<Type, FieldInfo[]>(4, 128);
@@ -51,7 +49,6 @@ namespace MiniContainer
             _objectGraphHashCodes = new HashSet<int>(16);
             _ignoreTypeList = ignoreTypeList;
             _registrations = registrations;
-            _enableParallelInitialization = enableParallelInitialization;
             CreateScope();
         }
 
@@ -200,31 +197,15 @@ namespace MiniContainer
         {
             var mainScope = ServiceDictionary[0];
             
-            if (!_enableParallelInitialization)
-            {
-                foreach (var dependencyObject in mainScope.Values)
-                {
-                    if (dependencyObject is InstanceRegistrationDependencyObject)
-                    {
-                        ResolveObject(dependencyObject.Implementation);
-                    }
-                }
-                return;
-            }
-            
-            var instanceObjects = new List<object>();
             foreach (var dependencyObject in mainScope.Values)
             {
                 if (dependencyObject is InstanceRegistrationDependencyObject)
                 {
-                    instanceObjects.Add(dependencyObject.Implementation);
+                    ResolveObject(dependencyObject.Implementation);
                 }
             }
             
-            if (instanceObjects.Count > 0)
-            {
-                Parallel.ForEach(instanceObjects, ResolveObject);
-            }
+            ExecutePendingInjections();
         }
         
 
