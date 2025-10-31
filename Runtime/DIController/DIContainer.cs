@@ -3,7 +3,6 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Reflection;
 using System.Runtime.CompilerServices;
-using System.Threading.Tasks;
 using UnityEngine;
 
 namespace MiniContainer
@@ -11,15 +10,15 @@ namespace MiniContainer
     public class DIContainer : IContainer, IContainerLifeCycle
     {
         private readonly List<Type> _ignoreTypeList;
-        private readonly HashSet<int> _objectGraphHashCodes;
         private readonly List<IRegistration> _registrations;
+        private readonly List<DependencyObject> _pendingInjections;
+        private readonly HashSet<int> _objectGraphHashCodes;
         private readonly ConcurrentDictionary<int, Dictionary<Type, DependencyObject>> _serviceDictionary;
-        private readonly object _dictionaryLock = new object();
         private readonly ConcurrentDictionary<Type, FieldInfo[]> _fieldCache;
         private readonly ConcurrentDictionary<Type, PropertyInfo[]> _propertyCache;
         private readonly ConcurrentDictionary<Type, MethodInfo[]> _methodCache;
         private readonly ConcurrentDictionary<Type, ConstructorInfo[]> _constructorCache;
-        private readonly bool _enableParallelInitialization;
+        private readonly object _dictionaryLock = new object();
         private ConstructorInfo _constructorInfo;
 
         public event Action OnContainerUpdate;
@@ -39,17 +38,17 @@ namespace MiniContainer
 
         private int _currentScopeID = -1;
   
-        public DIContainer(List<IRegistration> registrations, List<Type> ignoreTypeList, bool enableParallelInitialization = true)
+        public DIContainer(List<IRegistration> registrations, List<Type> ignoreTypeList)
         {
             _serviceDictionary = new ConcurrentDictionary<int, Dictionary<Type, DependencyObject>>();
             _fieldCache = new ConcurrentDictionary<Type, FieldInfo[]>(4, 128);
             _propertyCache = new ConcurrentDictionary<Type, PropertyInfo[]>(4, 128);
             _methodCache = new ConcurrentDictionary<Type, MethodInfo[]>(4, 128);
             _constructorCache = new ConcurrentDictionary<Type, ConstructorInfo[]>(4, 128);
+            _pendingInjections = new List<DependencyObject>(10);
             _objectGraphHashCodes = new HashSet<int>(16);
             _ignoreTypeList = ignoreTypeList;
             _registrations = registrations;
-            _enableParallelInitialization = enableParallelInitialization;
             CreateScope();
         }
 
@@ -198,31 +197,15 @@ namespace MiniContainer
         {
             var mainScope = ServiceDictionary[0];
             
-            if (!_enableParallelInitialization)
-            {
-                foreach (var dependencyObject in mainScope.Values)
-                {
-                    if (dependencyObject is InstanceRegistrationDependencyObject)
-                    {
-                        ResolveObject(dependencyObject.Implementation);
-                    }
-                }
-                return;
-            }
-            
-            var instanceObjects = new List<object>();
             foreach (var dependencyObject in mainScope.Values)
             {
                 if (dependencyObject is InstanceRegistrationDependencyObject)
                 {
-                    instanceObjects.Add(dependencyObject.Implementation);
+                    ResolveObject(dependencyObject.Implementation);
                 }
             }
             
-            if (instanceObjects.Count > 0)
-            {
-                Parallel.ForEach(instanceObjects, ResolveObject);
-            }
+            ExecutePendingInjections();
         }
         
 
@@ -235,9 +218,11 @@ namespace MiniContainer
                 return implementation;
             }
             
-            var dependencyObject = ResolveType(serviceType);
+            var dependencyObject = BuildType(serviceType);
             var impl = dependencyObject.Implementation;
 
+            ExecutePendingInjections();
+            
             if (dependencyObject.LifeTime == ServiceLifeTime.Transient)
             {
                 dependencyObject.Implementation = null;
@@ -321,8 +306,9 @@ namespace MiniContainer
             var properties = _propertyCache.GetOrAdd(type, t => 
                 t.GetProperties(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance));
 
-            foreach (var property in properties)
+            for (var i = 0; i < properties.Length; i++)
             {
+                var property = properties[i];
                 var attr = property.GetCustomAttribute(typeof(ResolveAttribute));
 
                 if (attr == null)
@@ -330,7 +316,7 @@ namespace MiniContainer
                     continue;
                 }
 
-                var propertyImpl = ResolveType(property.PropertyType).Implementation;
+                var propertyImpl = BuildType(property.PropertyType).Implementation;
                 var setter = Activator.GetPropertySetter(property);
                 setter(implementation, propertyImpl);
             }
@@ -343,8 +329,9 @@ namespace MiniContainer
             var fields = _fieldCache.GetOrAdd(type, t => 
                 t.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance));
 
-            foreach (var field in fields)
+            for (var i = 0; i < fields.Length; i++)
             {
+                var field = fields[i];
                 var attr = field.GetCustomAttribute(typeof(ResolveAttribute));
 
                 if (attr == null)
@@ -352,7 +339,7 @@ namespace MiniContainer
                     continue;
                 }
 
-                var fieldImpl = ResolveType(field.FieldType).Implementation;
+                var fieldImpl = BuildType(field.FieldType).Implementation;
                 var setter = Activator.GetFieldSetter(field);
                 setter(implementation, fieldImpl);
             }
@@ -365,8 +352,9 @@ namespace MiniContainer
             var methods = _methodCache.GetOrAdd(type, t => 
                 t.GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance));
 
-            foreach (var method in methods)
+            for (var i = 0; i < methods.Length; i++)
             {
+                var method = methods[i];
                 var attr = method.GetCustomAttribute(typeof(ResolveAttribute));
 
                 if (attr == null)
@@ -381,7 +369,7 @@ namespace MiniContainer
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private DependencyObject ResolveType(Type serviceType)
+        private DependencyObject BuildType(Type serviceType)
         {
             var dependencyObject = TryGetDependencyObject(serviceType);
 
@@ -427,17 +415,33 @@ namespace MiniContainer
                     }
                 }
                 
-                ResolveObject(dependencyObject.Implementation);
+                _pendingInjections.Add(dependencyObject);
                 CheckDisposableInterface(dependencyObject);
                 SetImplementationTypes(dependencyObject);
-                Initialize(dependencyObject);
             }
             
             _constructorInfo = null;
             _objectGraphHashCodes.Clear();
             return dependencyObject;
         }
+        
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private void ExecutePendingInjections()
+        {
+            if (_pendingInjections.Count == 0)
+                return;
 
+            for (var i = 0; i < _pendingInjections.Count; i++)
+            {
+                var dependencyObject = _pendingInjections[i];
+                ResolveObject(dependencyObject.Implementation);
+                Initialize(dependencyObject);
+            }
+
+            _pendingInjections.Clear();
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static void Initialize(DependencyObject dependencyObject)
         {
             if (dependencyObject.Implementation is IContainerInitializable initializable)
@@ -518,7 +522,7 @@ namespace MiniContainer
             for (var i = 0; i < parameters.Length; i++)
             {
                 var p = parameters[i];
-                instances[i] = ResolveType(p.ParameterType).Implementation;
+                instances[i] = BuildType(p.ParameterType).Implementation;
             }
 
             return instances;
