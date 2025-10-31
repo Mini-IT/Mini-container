@@ -485,8 +485,8 @@ builder.IgnoreType<ILogger>();
 ### Настройка контейнера
 
 ```csharp
-// Создание контейнера с отключенной параллельной инициализацией
-var container = diService.GenerateContainer(enableParallelInitialization: false);
+// Создание контейнера
+var container = diService.GenerateContainer();
 ```
 
 ### Освобождение ресурсов
