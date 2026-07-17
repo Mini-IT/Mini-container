@@ -26,6 +26,21 @@ namespace MiniContainer
             _ignoreTypeList.Add(type);
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool IsRegistered<T>()
+        {
+            var type = typeof(T);
+            for (int i = 0; i < _registrations.Count; i++)
+            {
+                if (_registrations[i].InterfaceTypes.Contains(type))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
         public DIContainer GenerateContainer()
         {
             var container = new DIContainer(_registrations, _ignoreTypeList);
