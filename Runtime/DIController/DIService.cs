@@ -7,6 +7,7 @@ namespace MiniContainer
     public class DIService : IDIService
     {
         private readonly List<IRegistration> _registrations = new List<IRegistration>();
+        private DIContainer _container;
 
         private readonly List<Type> _ignoreTypeList = new List<Type>()
         {
@@ -30,6 +31,17 @@ namespace MiniContainer
         public bool IsRegistered<T>()
         {
             var type = typeof(T);
+            
+            if (_container != null && _container.IsRegistered(type))
+            {
+                return true;
+            }
+
+            if (IsTypeIgnored(type))
+            {
+                return false;
+            }
+
             for (int i = 0; i < _registrations.Count; i++)
             {
                 if (_registrations[i].InterfaceTypes.Contains(type))
@@ -41,12 +53,26 @@ namespace MiniContainer
             return false;
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private bool IsTypeIgnored(Type type)
+        {
+            for (var i = 0; i < _ignoreTypeList.Count; i++)
+            {
+                if (_ignoreTypeList[i] == type)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
         public DIContainer GenerateContainer()
         {
-            var container = new DIContainer(_registrations, _ignoreTypeList);
-            this.RegisterInstance(new ScopeManager(container)).AsImplementedInterfaces();
-            this.RegisterInstance<IContainerLifeCycle>(container);
-            return container;
+            _container = new DIContainer(_registrations, _ignoreTypeList);
+            this.RegisterInstance(new ScopeManager(_container)).AsImplementedInterfaces();
+            this.RegisterInstance<IContainerLifeCycle>(_container);
+            return _container;
         }
     }
 }

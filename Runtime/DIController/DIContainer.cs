@@ -207,6 +207,20 @@ namespace MiniContainer
             
             ExecutePendingInjections();
         }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal bool IsRegistered(Type serviceType)
+        {
+            if (!_serviceDictionary.TryGetValue(0, out var mainScope))
+            {
+                return false;
+            }
+
+            lock (_dictionaryLock)
+            {
+                return mainScope.ContainsKey(serviceType);
+            }
+        }
         
 
 
