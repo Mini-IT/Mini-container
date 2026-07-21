@@ -13,7 +13,16 @@ namespace MiniContainer.Tests
 
             container.ResolveInstanceRegistered();
 
-            Assert.That(service.IsRegistered<ITestService>(), Is.True);
+            Assert.True(service.IsRegistered<ITestService>());
+        }
+        
+        [Test]
+        public void IsRegistered_ReturnsTrueForRegisteredType()
+        {
+            var service = new DIService();
+            service.Register<ITestService, TestService>();
+            
+            Assert.True(service.IsRegistered<ITestService>());
         }
 
         [Test]
@@ -23,7 +32,7 @@ namespace MiniContainer.Tests
             service.Register<IIgnoredService, IgnoredService>();
             service.IgnoreType<IIgnoredService>();
 
-            Assert.That(service.IsRegistered<IIgnoredService>(), Is.False);
+            Assert.False(service.IsRegistered<IIgnoredService>());
         }
 
         [Test]
@@ -37,7 +46,7 @@ namespace MiniContainer.Tests
 
             container.Release(typeof(ITestService));
 
-            Assert.That(service.IsRegistered<ITestService>(), Is.False);
+            Assert.False(service.IsRegistered<ITestService>());
         }
 
         private interface ITestService
