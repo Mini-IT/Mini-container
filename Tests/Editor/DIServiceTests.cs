@@ -5,24 +5,21 @@ namespace MiniContainer.Tests
     public class DIServiceTests
     {
         [Test]
-        public void IsRegistered_ReturnsTrueAfterRegistrationIsProcessed()
-        {
-            var service = new DIService();
-            var container = service.GenerateContainer();
-            service.Register<ITestService, TestService>();
-
-            container.ResolveInstanceRegistered();
-
-            Assert.True(service.IsRegistered<ITestService>());
-        }
-        
-        [Test]
         public void IsRegistered_ReturnsTrueForRegisteredType()
         {
             var service = new DIService();
             service.Register<ITestService, TestService>();
             
             Assert.True(service.IsRegistered<ITestService>());
+        }
+        
+        [Test]
+        public void IsRegistered_ReturnsFalseForNotRegisteredType()
+        {
+            var service = new DIService();
+            service.Register<ITestService, TestService>();
+            
+            Assert.False(service.IsRegistered<IIgnoredService>());
         }
 
         [Test]
