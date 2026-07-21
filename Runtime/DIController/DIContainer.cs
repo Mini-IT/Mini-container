@@ -371,7 +371,7 @@ namespace MiniContainer
                     dependencyObject = value;
                 }
                 
-                if (dependencyObject.TryGetImplementation(out var implementation))
+                if (dependencyObject.TryGetImplementation(this, out var implementation))
                 {
                     dependencyObject.Implementation = implementation;
                 }
