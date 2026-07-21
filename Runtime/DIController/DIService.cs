@@ -7,9 +7,8 @@ namespace MiniContainer
     public class DIService : IDIService
     {
         private readonly List<IRegistration> _registrations = new List<IRegistration>();
-        private DIContainer _container;
 
-        private readonly List<Type> _ignoreTypeList = new List<Type>()
+        private readonly HashSet<Type> _ignoreTypes = new HashSet<Type>()
         {
             typeof(IDisposable)
         };
@@ -24,7 +23,7 @@ namespace MiniContainer
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void IgnoreType<T>(T type) where T : Type
         {
-            _ignoreTypeList.Add(type);
+            _ignoreTypes.Add(type);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -32,12 +31,7 @@ namespace MiniContainer
         {
             var type = typeof(T);
             
-            if (_container != null && _container.IsRegistered(type))
-            {
-                return true;
-            }
-
-            if (IsTypeIgnored(type))
+            if (_ignoreTypes.Contains(type))
             {
                 return false;
             }
@@ -53,26 +47,12 @@ namespace MiniContainer
             return false;
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private bool IsTypeIgnored(Type type)
-        {
-            for (var i = 0; i < _ignoreTypeList.Count; i++)
-            {
-                if (_ignoreTypeList[i] == type)
-                {
-                    return true;
-                }
-            }
-
-            return false;
-        }
-
         public DIContainer GenerateContainer()
         {
-            _container = new DIContainer(_registrations, _ignoreTypeList);
-            this.RegisterInstance(new ScopeManager(_container)).AsImplementedInterfaces();
-            this.RegisterInstance<IContainerLifeCycle>(_container);
-            return _container;
+            var container = new DIContainer(_registrations, _ignoreTypes);
+            this.RegisterInstance(new ScopeManager(container)).AsImplementedInterfaces();
+            this.RegisterInstance<IContainerLifeCycle>(container);
+            return container;
         }
     }
 }
