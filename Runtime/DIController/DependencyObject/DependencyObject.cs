@@ -10,7 +10,7 @@ namespace MiniContainer
         internal readonly List<Type> InterfaceTypes;
         internal readonly ServiceLifeTime LifeTime;
         
-        private readonly Func<object> _getImplementation;
+        private readonly Func<IContainer, object> _getImplementation;
         
         internal Type ServiceType { get; set; }
         internal object Implementation { get; set; }
@@ -19,7 +19,7 @@ namespace MiniContainer
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal DependencyObject(Type serviceType, Type implementationType, object implementation,
-            ServiceLifeTime lifeTime, List<Type> interfaceTypes, Func<object> getImplementation = null)
+            ServiceLifeTime lifeTime, List<Type> interfaceTypes, Func<IContainer, object> getImplementation = null)
         {
             ServiceType = serviceType;
             LifeTime = lifeTime;
@@ -41,11 +41,11 @@ namespace MiniContainer
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool TryGetImplementation(out object implementation)
+        public bool TryGetImplementation(IContainer container, out object implementation)
         {
             if (_getImplementation != null)
             {
-                implementation = _getImplementation();
+                implementation = _getImplementation.Invoke(container);
                 return true;
             }
             implementation = null;
