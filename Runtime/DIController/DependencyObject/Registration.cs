@@ -20,7 +20,7 @@ namespace MiniContainer
 
         public object Implementation { get; internal set; }
         
-        public Func<object> GetImplementation { get; set; }
+        public Func<IContainer, object> GetImplementation { get; set; }
 
         public List<Type> InterfaceTypes { get; private set; }
 

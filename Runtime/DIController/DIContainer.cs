@@ -9,7 +9,7 @@ namespace MiniContainer
 {
     public class DIContainer : IContainer, IContainerLifeCycle
     {
-        private readonly List<Type> _ignoreTypeList;
+        private readonly HashSet<Type> _ignoreTypes;
         private readonly List<IRegistration> _registrations;
         private readonly List<DependencyObject> _pendingInjections;
         private readonly HashSet<int> _objectGraphHashCodes;
@@ -38,7 +38,7 @@ namespace MiniContainer
 
         private int _currentScopeID = -1;
   
-        public DIContainer(List<IRegistration> registrations, List<Type> ignoreTypeList)
+        public DIContainer(List<IRegistration> registrations, HashSet<Type> ignoreTypes)
         {
             _serviceDictionary = new ConcurrentDictionary<int, Dictionary<Type, DependencyObject>>();
             _fieldCache = new ConcurrentDictionary<Type, FieldInfo[]>(4, 128);
@@ -47,7 +47,7 @@ namespace MiniContainer
             _constructorCache = new ConcurrentDictionary<Type, ConstructorInfo[]>(4, 128);
             _pendingInjections = new List<DependencyObject>(10);
             _objectGraphHashCodes = new HashSet<int>(16);
-            _ignoreTypeList = ignoreTypeList;
+            _ignoreTypes = ignoreTypes;
             _registrations = registrations;
             CreateScope();
         }
@@ -112,7 +112,7 @@ namespace MiniContainer
                 for (var j = 0; j < registration.InterfaceTypes.Count; j++)
                 {
                     var interfaceType = registration.InterfaceTypes[j];
-                    if (IsIgnoreType(interfaceType))
+                    if (_ignoreTypes.Contains(interfaceType))
                     {
                         registration.InterfaceTypes.RemoveAt(j);
                         j--;
@@ -134,20 +134,6 @@ namespace MiniContainer
             }
 
             _registrations.Clear();
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private bool IsIgnoreType(Type interfaceType)
-        {
-            var count = _ignoreTypeList.Count;
-            for (var i = 0; i < count; i++)
-            {
-                if (_ignoreTypeList[i] == interfaceType)
-                {
-                    return true;
-                }
-            }
-            return false;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -385,7 +371,7 @@ namespace MiniContainer
                     dependencyObject = value;
                 }
                 
-                if (dependencyObject.TryGetImplementation(out var implementation))
+                if (dependencyObject.TryGetImplementation(this, out var implementation))
                 {
                     dependencyObject.Implementation = implementation;
                 }

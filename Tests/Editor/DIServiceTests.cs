@@ -1,0 +1,68 @@
+using NUnit.Framework;
+
+namespace MiniContainer.Tests
+{
+    public class DIServiceTests
+    {
+        [Test]
+        public void IsRegistered_ReturnsTrueForRegisteredType()
+        {
+            var service = new DIService();
+            service.Register<ITestService, TestService>();
+            
+            Assert.True(service.IsRegistered<ITestService>());
+        }
+        
+        [Test]
+        public void IsRegistered_ReturnsFalseForNotRegisteredType()
+        {
+            var service = new DIService();
+            service.Register<ITestService, TestService>();
+            
+            Assert.False(service.IsRegistered<IIgnoredService>());
+        }
+
+        [Test]
+        public void IsRegistered_ReturnsFalseForIgnoredPendingRegistration()
+        {
+            var service = new DIService();
+            service.Register<IIgnoredService, IgnoredService>();
+            service.IgnoreType<IIgnoredService>();
+
+            Assert.False(service.IsRegistered<IIgnoredService>());
+        }
+
+        [Test]
+        public void IsRegistered_ReturnsFalseAfterServiceIsReleased()
+        {
+            var service = new DIService();
+            var container = service.GenerateContainer();
+            service.Register<ITestService, TestService>();
+            container.ResolveInstanceRegistered();
+            container.Resolve(typeof(ITestService));
+
+            container.Release(typeof(ITestService));
+
+            Assert.False(service.IsRegistered<ITestService>());
+        }
+
+        private interface ITestService
+        {
+        }
+
+        private sealed class TestService : ITestService
+        {
+            public TestService()
+            {
+            }
+        }
+
+        private interface IIgnoredService
+        {
+        }
+
+        private sealed class IgnoredService : IIgnoredService
+        {
+        }
+    }
+}
