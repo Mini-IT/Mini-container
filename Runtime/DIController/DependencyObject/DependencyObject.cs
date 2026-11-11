@@ -36,7 +36,7 @@ namespace MiniContainer
             LifeTime = dependencyObject.LifeTime;
             ImplementationType = dependencyObject.ImplementationType;
             Implementation = dependencyObject.Implementation;
-            InterfaceTypes = dependencyObject.InterfaceTypes;
+            InterfaceTypes = new List<Type>(dependencyObject.InterfaceTypes);
             _getImplementation = dependencyObject._getImplementation;
         }
 
