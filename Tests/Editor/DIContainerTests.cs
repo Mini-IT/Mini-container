@@ -13,6 +13,7 @@ namespace MiniContainer.Tests
             var service = new DIService();
             service.RegisterScoped<ScopedService>().AsImplementedInterfaces();
             var container = service.GenerateContainer();
+            var previousScope = container.GetCurrentScope();
             ScopedService previousInstance = null;
 
             try
@@ -20,6 +21,7 @@ namespace MiniContainer.Tests
                 for (var i = 0; i < 3; i++)
                 {
                     var scope = container.CreateScope();
+                    Assert.AreEqual(previousScope + 1, scope);
                     var instance = (ScopedService)container.Resolve(firstServiceType);
 
                     Assert.AreSame(instance, container.Resolve<IFirstService>());
@@ -30,6 +32,7 @@ namespace MiniContainer.Tests
                     container.ReleaseScope(scope);
 
                     Assert.AreEqual(1, instance.DisposeCount);
+                    previousScope = scope;
                     previousInstance = instance;
                 }
             }
@@ -78,6 +81,60 @@ namespace MiniContainer.Tests
                 container.SetCurrentScope(secondScope);
                 Assert.AreSame(secondInstance, container.Resolve<IFirstService>());
                 Assert.AreSame(secondInstance, container.Resolve<ISecondService>());
+            }
+            finally
+            {
+                container.ReleaseAll();
+            }
+        }
+
+        [TestCase(true)]
+        [TestCase(false)]
+        public void CreateScope_AfterChangingCurrentScope_PreservesOtherLiveScopes(bool releaseCurrentScope)
+        {
+            var service = new DIService();
+            service.RegisterScoped<ScopedService>();
+            var container = service.GenerateContainer();
+
+            try
+            {
+                Assert.AreEqual(0, container.GetCurrentScope());
+                var firstScope = container.CreateScope();
+                var firstInstance = container.Resolve<ScopedService>();
+                var secondScope = container.CreateScope();
+                var secondInstance = container.Resolve<ScopedService>();
+
+                if (releaseCurrentScope)
+                {
+                    container.ReleaseScope(secondScope);
+                    Assert.AreEqual(0, container.GetCurrentScope());
+                }
+                else
+                {
+                    container.SetCurrentScope(firstScope);
+                }
+
+                var thirdScope = container.CreateScope();
+                var thirdInstance = container.Resolve<ScopedService>();
+
+                Assert.AreEqual(secondScope + 1, thirdScope);
+                Assert.AreEqual(thirdScope, container.GetCurrentScope());
+                Assert.AreNotSame(firstInstance, thirdInstance);
+                Assert.AreNotSame(secondInstance, thirdInstance);
+                Assert.AreEqual(0, firstInstance.DisposeCount);
+                Assert.AreEqual(releaseCurrentScope ? 1 : 0, secondInstance.DisposeCount);
+
+                container.SetCurrentScope(firstScope);
+                Assert.AreSame(firstInstance, container.Resolve<ScopedService>());
+
+                if (!releaseCurrentScope)
+                {
+                    container.SetCurrentScope(secondScope);
+                    Assert.AreSame(secondInstance, container.Resolve<ScopedService>());
+                }
+
+                container.ReleaseScope(firstScope);
+                Assert.AreEqual(1, firstInstance.DisposeCount);
             }
             finally
             {

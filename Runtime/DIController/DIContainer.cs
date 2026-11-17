@@ -37,6 +37,7 @@ namespace MiniContainer
         }
 
         private int _currentScopeID = -1;
+        private int _lastScopeID = -1;
   
         public DIContainer(List<IRegistration> registrations, HashSet<Type> ignoreTypes)
         {
@@ -72,7 +73,7 @@ namespace MiniContainer
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public int CreateScope()
         {
-            _currentScopeID++;
+            _currentScopeID = checked(++_lastScopeID);
             var newScope = new Dictionary<Type, DependencyObject>(32);
             _serviceDictionary[_currentScopeID] = newScope;
             Logs.Log($"<color=green> New scope has been created with ID: {_currentScopeID}</color>");
